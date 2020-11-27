@@ -227,7 +227,7 @@ class Bot1:
         self.get_current_price_target()
         can = True
         for sell in self.open_sells:
-            adjusted_sell_price = round(sell['price'] - self.fee*sell['price'], self.usd_decimal_places)
+            adjusted_sell_price = round(sell['price'] - (self.fee*2*sell['price']), self.usd_decimal_places)
             #print('check_if_can_buy: {}:{} <= {}'.format(sell['price'], adjusted_sell_price, self.current_price_target))
             if adjusted_sell_price <= self.current_price_target:
                 can = False
