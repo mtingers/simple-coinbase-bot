@@ -43,5 +43,6 @@ buy_wallet_percent = 10.0
 # Enable Coinbase API response debug logging
 debug_log_response = False
 debug_log_response_file = debug1.log
+max_sells = 8
 ```
 

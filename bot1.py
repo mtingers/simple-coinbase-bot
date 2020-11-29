@@ -24,6 +24,7 @@ class Bot1:
         self.mail_host = config['general'].get('mail_host')
         self.logfile = config['general'].get('logfile')
         self.coin = config['general'].get('coin')
+        self.max_sells = config['general'].getint('max_sells')
         self.sell_at_percent = config['general'].getfloat('sell_at_percent')
         self.sleepsecs = config['general'].getint('sleepsecs')
         self.debug_log_response = config['general'].getboolean('debug_log_response')
@@ -45,7 +46,12 @@ class Bot1:
         tmp = float(config['general'].get('buy_wallet_percent'))
         self.buy_percent_of_wallet = round(Decimal(tmp/100.0), 4)
         self.last_buy = None
-        self.logit('Bot1 started...')
+        # Run all and validate it worked on init
+        self.get_all()
+        self.__assert()
+        self.logit('Bot1 started: {} size-precision:{} usd-precision:{} current-fee:{} min-size:{} max-size:{}'.format(
+            self.coin, self.size_decimal_places, self.usd_decimal_places, self.fee, self.min_size, self.max_size
+        ))
 
     def _log(self, path, msg):
         now = datetime.now()
@@ -225,6 +231,9 @@ class Bot1:
             Only allow within the fee range though to keep buy/sells further apart.
         """
         self.get_current_price_target()
+        if len(self.open_sells) >= self.max_sells:
+            self.logit('WARNING: max_sells hit ({} of {})'.format(len(self.open_sells), self.max_sells))
+            return False
         can = True
         for sell in self.open_sells:
             adjusted_sell_price = round(sell['price'] - (self.fee*2*sell['price']), self.usd_decimal_places)
