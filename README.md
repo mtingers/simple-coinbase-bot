@@ -14,10 +14,14 @@ the size amount from the buy response completed order.
 python3 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-cp bot1-example.conf bot1.conf
-chmod 700 bot1-example.conf
-# edit config
-python bot1.py bot1.conf
+cp simplebot-example.conf simplebot.conf
+chmod 700 simplebot.conf
+# edit config simplebot.conf
+```
+
+Run:
+```
+python simplebot.py simplebot.conf
 ```
 
 # Example Config
@@ -29,20 +33,47 @@ passphrase = 123
 b64secret = abc
 
 [general]
-# sell_at_percent will set a target price from the buy price
-# this percent adds fees in (fees+sell_at_percent) to find the
-# target sell price
-sell_at_percent = 1.0
+# How many seconds to sleep between polling. You should probably
+# keep around 60 seconds to avoid polling too often (it's not a realtime
+# order-book tracker)
+sleep_seconds = 60
+log_file = log/simplebot.log
+cache_file = cache/simplebot.cache
+
+
+[market]
 coin = BTC-USD
-logfile = bot1.log
+
+# The price increase to sell at from the bought price.
+# Fees are added in to this total and accounted for.
+# Example:
+# bought_price = 100.0, sell_at_percent = 1.0
+# sell_price = bought_price + (bought_price * (sell_at_percent/100.0 + fees))
+sell_at_percent = 1.0
+
+# How much of your total USD wallet can be used each buy.
+buy_wallet_percent = 7.5
+
+
+[limits]
+# Limits to avoid buying in too much in a specific range or time period
+
+# Maximum number of outstanding sell orders. If reached, no more buys can be placed.
+max_sells_outstanding = 15
+
+# Maximum amount of buys per hour
+max_buys_per_hour = 10
+
+
+[notify]
 mail_host = mail.example.com
 mail_from = foo@example.com
 mail_to = email1@example.com, email2@example.com
-sleepsecs = 60
-buy_wallet_percent = 10.0
+
+
+[debug]
 # Enable Coinbase API response debug logging
 debug_log_response = False
 debug_log_response_file = debug1.log
-max_sells = 8
 ```
 
