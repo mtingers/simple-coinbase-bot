@@ -217,7 +217,7 @@ class SimpleCoinbaseBot:
         done = False
         error = False
         status_errors = 0
-        time.sleep(1.5)
+        time.sleep(5)
         while 1:
             try:
                 buy = self.client.get_order(order_id)
@@ -233,12 +233,12 @@ class SimpleCoinbaseBot:
                 else:
                     if 'message' in buy:
                         self.logit('WARNING: Failed to get order status: {}'.format(buy['message']))
-                        self.logit('WARNING: Order status failure may be due to coinbase issues. Check: https://status.pro.coinbase.com')
+                        self.logit('WARNING: Order status failure may be temporary, due to coinbase issues or exchange delays. Check: https://status.pro.coinbase.com')
                         status_errors += 1
                     else:
                         self.logit('WARNING: Failed to get order status: {}'.format(order_id))
                         status_errors += 1
-                    time.sleep(6)
+                    time.sleep(10)
                 if status_errors > 10:
                     errors += 1
             except Exception as err:
@@ -306,12 +306,12 @@ class SimpleCoinbaseBot:
                     buy_filled_size = Decimal(v['last_status']['filled_size'])
                     buy_value = Decimal(v['last_status']['executed_value'])
                     #buy_sell_diff = round((sell_price*sell_filled_size) - (buy_price*buy_filled_size), 2)
-                    buy_sell_diff = sell_value - buy_value
+                    buy_sell_diff = round(sell_value - buy_value, 2)
                     self.cache[buy_order_id]['profit_usd'] = buy_sell_diff
                     msg = 'SELL-COMPLETED: ~duration:{:.2f} bought_val:{} sold_val:{} profit_usd:{}'.format(
                         time.time() - v['time'],
-                        v['last_status']['executed_value'],
-                        sell['executed_value'],
+                        round(buy_value, 2),
+                        round(sell_value, 2),
                         buy_sell_diff
                     )
                     self.logit(msg)
