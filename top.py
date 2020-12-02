@@ -39,9 +39,10 @@ def top():
     print('')
     files = glob.glob(sys.argv[1]+'/*.cache')
     stats = {}
+    stats_incomplete = {}
     recent = []
     cur_time = time.time()
-
+    open_times = []
     for f in files:
         data = None
         coin = None
@@ -50,7 +51,7 @@ def top():
         if not data:
             continue
 
-        for _, v in data.items():
+        for order_id, v in data.items():
             if not v['first_status']:
                 continue
             coin = v['first_status']['product_id']
@@ -71,6 +72,8 @@ def top():
             elif v['completed']:
                 stats[coin]['error_orders'] += 1
             else:
+                start_epoch = time.mktime(time.strptime(v['first_status']['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
+                open_times.append(cur_time - start_epoch)
                 stats[coin]['open_orders'] += 1
 
     sorted_keys = sorted(stats.keys())
@@ -124,6 +127,14 @@ def top():
             colors.fg.pink, '$'+str(round(sum(agg_profits)/len(agg_profits), 2)),
             colors.reset,
     ))
+
+    print('{}{}{}'.format(colors.fg.darkgrey, '-'*105, colors.reset))
+    min_open_time = sec2time(round(min(open_times), 2), 0)
+    max_open_time = sec2time(round(max(open_times), 2), 0)
+    avg_open_time = sec2time(round(sum(open_times)/len(open_times), 2), 0)
+    print(colors.fg.lightgrey)
+    print('{:>24} {:>15} {:>15} {:>15}'.format('Open order durations', 'Min', 'Max', 'Avg'))
+    print('{:>24} {:>15} {:>15} {:>15}'.format('', min_open_time, max_open_time, avg_open_time))
 
     if recent:
         print('{}{}{}'.format(colors.fg.darkgrey, '-'*105, colors.reset))
