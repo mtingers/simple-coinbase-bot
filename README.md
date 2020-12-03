@@ -1,7 +1,7 @@
 # simple-coinbase-bot
 A simple Coinbase Pro buy/sell bot.
 
-The primary purpose of this bought is to buy incrementally as the price goes up and down.
+The primary purpose of this bot is to buy/sell incrementally as the price goes up and down.
 It does not do anything fancy:
 1. Buy if there are no outstanding sell orders less than the current target sell price.
 2. Target sell price is determined from `sell_at_percent` config option and current
