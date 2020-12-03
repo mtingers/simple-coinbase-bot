@@ -18,9 +18,6 @@ from filelock import Timeout, FileLock
 from random import uniform
 
 class SimpleCoinbaseBot:
-    """ A simple bot that buys whenever it can. It can only not buy if there is currently
-    an open sell order <= to the current target price
-    """
     def __init__(self, config):
         self.config = config
         self.log_file = config['general'].get('log_file')
@@ -32,7 +29,8 @@ class SimpleCoinbaseBot:
         try:
             self.lock.acquire()
         except:
-            print('ERROR: Failed to acquire lock: {}. Is another process already running with this config?'.format(self.lock_file))
+            print('ERROR: Failed to acquire lock: {}'.format(self.lock_file))
+            print('Is another process already running with this config?')
             exit(1)
 
         self.cache = {}
@@ -185,7 +183,8 @@ class SimpleCoinbaseBot:
         for email in self.mail_to:
             if not email.strip():
                 continue
-            headers = "From: %s\r\nTo: %s\r\nSubject: %s %s\r\n\r\n" % (self.mail_from, email, self.coin, subject)
+            headers = "From: %s\r\nTo: %s\r\nSubject: %s %s\r\n\r\n" % (
+                self.mail_from, email, self.coin, subject)
             if not msg:
                 msg2 = subject
             else:
@@ -207,19 +206,22 @@ class SimpleCoinbaseBot:
 
         # Check if USD wallet has enough available
         if self.wallet < Decimal(self.product_info['min_market_funds']):
-            self.logit('WARNING: Wallet value too small (<${}): {}'.format(self.product_info['min_market_funds'], self.wallet))
+            self.logit('WARNING: Wallet value too small (<${}): {}'.format(
+                self.product_info['min_market_funds'], self.wallet))
             return
 
         # Calculate and check if size is large enough (sometimes it's not if available wallet is too small)
         buy_amount = round(Decimal(self.buy_percent_of_wallet) * Decimal(self.wallet), self.usd_decimal_places)
         buy_size = round(Decimal(buy_amount)/self.current_price, self.size_decimal_places)
         if buy_size <= self.min_size:
-            self.logit('WARNING: Buy size is too small {} < {} wallet:{}.'.format(buy_size, self.min_size, self.wallet))
+            self.logit('WARNING: Buy size is too small {} < {} wallet:{}.'.format(
+                buy_size, self.min_size, self.wallet))
             return
 
         # Check if USD wallet has enough available
         if buy_amount < Decimal(self.product_info['min_market_funds']):
-            self.logit('WARNING: Buy amount too small (<${}): {}'.format(self.product_info['min_market_funds'], buy_amount))
+            self.logit('WARNING: Buy amount too small (<${}): {}'.format(
+                self.product_info['min_market_funds'], buy_amount))
             return
 
         # Make sure buy_amount is within buy_wallet_min/max
@@ -232,7 +234,8 @@ class SimpleCoinbaseBot:
 
         # adjust size to fit with fee
         buy_size = round(Decimal(buy_size) - Decimal(buy_size)*Decimal(self.fee), self.size_decimal_places)
-        self.logit('BUY: price:{} amount:{} size:{}'.format(self.current_price, buy_amount, buy_size))
+        self.logit('BUY: price:{} amount:{} size:{}'.format(
+            self.current_price, buy_amount, buy_size))
         rc = self.client.place_market_order(
             product_id=self.coin,
             side='buy',
@@ -283,7 +286,8 @@ class SimpleCoinbaseBot:
                 errors += 1
                 time.sleep(8)
             if errors > 5:
-                self.logit('WARNING: Failed to get order id. You will manually need to fix this buy/sell.: {}'.format(order_id))
+                self.logit('WARNING: Failed to get order. Manual intervention needed.: {}'.format(
+                    order_id))
                 break
             time.sleep(2)
 
@@ -298,7 +302,8 @@ class SimpleCoinbaseBot:
             self.logdebug(rc)
             self.logit('SELL-RESPONSE: {}'.format(rc))
             msg = 'BUY-FILLED: size:{} funds:{}\n'.format(buy['filled_size'], buy['funds'])
-            msg = '{} SELL-PLACED: size:{} price:{}'.format(msg, self.last_buy['filled_size'], self.current_price_target)
+            msg = '{} SELL-PLACED: size:{} price:{}'.format(
+                msg, self.last_buy['filled_size'], self.current_price_target)
             for m in msg.split('\n'):
                 self.logit(m.strip())
             self.sendemail('BUY/SELL', msg=msg)
@@ -310,7 +315,8 @@ class SimpleCoinbaseBot:
             if 'message' in buy:
                 msg = 'BUY-PLACED-NOSTATUS: {}\n'.format(buy['message'])
             else:
-                msg = 'BUY-PLACED-NOSTATUS: size:{} funds:{}\n'.format(buy['filled_size'], buy['funds'])
+                msg = 'BUY-PLACED-NOSTATUS: size:{} funds:{}\n'.format(
+                    buy['filled_size'], buy['funds'])
             self.logit(msg)
             self.sendemail('BUY-ERROR', msg=msg)
         return buy
@@ -321,15 +327,17 @@ class SimpleCoinbaseBot:
             if self.cache[buy_order_id]['completed']:
                 continue
             if not v['sell_order']:
-                self.logit('WARNING: No sell_order for buy {}. This should not happen.'.format(buy_order_id))
+                self.logit('WARNING: No sell_order for buy {}. This should not happen.'.format(
+                    buy_order_id))
                 if time.time() - v['time'] > 60*30:
-                    self.logit('WARNING: Writing order as completed since it has no sell_order associated.')
+                    self.logit('WARNING: Writing as done since it has no sell_order associated.')
                     self.cache[buy_order_id]['completed'] = True
                     self._write_cache()
                 continue
             sell = self.client.get_order(v['sell_order']['id'])
             if 'message' in sell:
-                self.logit('WARNING: Failed to get sell order status likely due to coinbase errors. Skipping for now: {}'.format(sell['message']))
+                self.logit('WARNING: Failed to get sell order status (retrying later): {}'.format(
+                    sell['message']))
                 continue
 
             if 'status' in sell and sell['status'] != 'open':
@@ -360,7 +368,10 @@ class SimpleCoinbaseBot:
 
     def get_current_price_target(self):
         current_percent_increase = (self.fee*2)+(self.sell_at_percent/100)
-        self.current_price_target = round(self.current_price * current_percent_increase + self.current_price, self.usd_decimal_places)
+        self.current_price_target = round(
+            self.current_price * current_percent_increase + self.current_price,
+            self.usd_decimal_places
+        )
         self.current_price_increase = self.current_price * current_percent_increase
         return self.current_price_target
 
@@ -397,7 +408,8 @@ class SimpleCoinbaseBot:
         # Don't count other orders now, only ones being tracked here
         #if len(self.open_sells) >= self.max_sells_outstanding:
         if self.total_open_orders >= self.max_sells_outstanding:
-            self.logit('WARNING: max_sells_outstanding hit ({} of {})'.format(self.total_open_orders, self.max_sells_outstanding))
+            self.logit('WARNING: max_sells_outstanding hit ({} of {})'.format(
+                self.total_open_orders, self.max_sells_outstanding))
             return False
         can = True
         for buy_order_id, v in self.cache.items(): #self.open_sells:
