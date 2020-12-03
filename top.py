@@ -12,26 +12,36 @@ from color import colors
 os.environ['TZ'] = 'UTC'
 time.tzset()
 
+def draw_line(thickness):
+    if thickness == 1:
+        print('{}{}{}'.format(colors.fg.darkgrey, u'\u2581'*80, colors.reset))
+    elif thickness == 2:
+        print('{}{}{}'.format(colors.fg.darkgrey, u'\u2582'*80, colors.reset))
+    elif thickness == 3:
+        print('{}{}{}'.format(colors.fg.darkgrey, u'\u2583'*80, colors.reset))
+    elif thickness == 4:
+        print('{}{}{}'.format(colors.fg.darkgrey, u'\u2584'*80, colors.reset))
+    elif thickness == 5:
+        print('{}{}{}'.format(colors.fg.darkgrey, u'\u2585'*80, colors.reset))
+    else:
+        print('{}{}{}'.format(colors.fg.darkgrey, u'\u2586'*80, colors.reset))
+
 def clear():
     if name == 'nt':
         system('cls')
     else:
         system('clear')
 
-def sec2time(sec, n_msec=3):
-    ''' Convert seconds to 'D days, HH:MM:SS.FFF' '''
+def sec2time(sec):
     if hasattr(sec,'__len__'):
         return [sec2time(s) for s in sec]
     m, s = divmod(sec, 60)
     h, m = divmod(m, 60)
     d, h = divmod(h, 24)
-    if n_msec > 0:
-        pattern = '%%02d:%%02d:%%0%d.%df' % (n_msec+3, n_msec)
-    else:
-        pattern = r'%02d:%02d:%02d'
+    pattern = r'%2dh %2dm %2ds'
     if d == 0:
         return pattern % (h, m, s)
-    return ('%d days, ' + pattern) % (d, h, m, s)
+    return ('%dd ' + pattern) % (d, h, m, s)
 
 def avg(l):
     if len(l) < 1:
@@ -86,19 +96,19 @@ def top():
                 stats[coin]['open_orders'] += 1
 
     sorted_keys = sorted(stats.keys())
-    print('{:>100} UTC'.format(str(datetime.now()).split('.')[0]))
-    print('{}{}{}'.format(colors.fg.darkgrey, '-'*105, colors.reset))
-    print('{}{:>8} {}{:>15} {}{:>15} {}{:>15} {}{:>15} {}{:>15} {}{:>15}{}'.format(
+    print('{:>75} UTC'.format(str(datetime.now()).split('.')[0]))
+    draw_line(1)
+    print('{}{:>8} {}{:>13} {}{:>7} {}{:>7} {}{:>7} {}{:>12} {}{:>19}{}'.format(
         colors.fg.lightcyan, 'Coin',
         colors.fg.green, 'Profits',
         colors.fg.yellow, 'Open',
         colors.fg.blue, 'Done',
         colors.fg.red, 'Error',
-        colors.fg.orange, 'Avg-Time',
         colors.fg.pink, 'Avg-Profit',
+        colors.fg.orange, 'Avg-Time',
         colors.reset,
     ))
-    print('{}{}{}'.format(colors.fg.darkgrey, '-'*105, colors.reset))
+    draw_line(1)
     total_profits = Decimal('0.0')
     total_open_orders = 0
     total_done_orders = 0
@@ -108,14 +118,14 @@ def top():
     for key in sorted_keys:
         coin = key
         v = stats[key]
-        print('{}{:>8} {}{:>15} {}{:>15} {}{:>15} {}{:>15} {}{:>15} {}{:>15}{}'.format(
+        print('{}{:>8} {}{:>13} {}{:>7} {}{:>7} {}{:>7} {}{:>12} {}{:>19}{}'.format(
             colors.fg.lightcyan, coin,
             colors.fg.green, '$'+str(round(sum(v['profits']), 2)),
             colors.fg.yellow, v['open_orders'],
             colors.fg.blue, v['done_orders'],
             colors.fg.red, v['error_orders'],
-            colors.fg.orange, sec2time(round(avg(v['epoch_diffs']), 2), 0) if v['epoch_diffs'] else 'None',
             colors.fg.pink, '$'+str(round(avg(stats[coin]['profits']), 2)),
+            colors.fg.orange, sec2time(round(avg(v['epoch_diffs']), 2)) if v['epoch_diffs'] else 'None',
             colors.reset,
         ))
         #if v['epoch_diffs']:
@@ -125,28 +135,27 @@ def top():
         total_done_orders += v['done_orders']
         total_error_orders += v['error_orders']
         total_profits += round(sum(v['profits']), 2)
-    print('{}{}{}'.format(colors.fg.darkgrey, '-'*105, colors.reset))
-    print('{}{:>8} {}{:>15} {}{:>15} {}{:>15} {}{:>15} {}{:>15} {}{:>15}{}'.format(
+    draw_line(1)
+    print('{}{:>8} {}{:>13} {}{:>7} {}{:>7} {}{:>7} {}{:>12} {}{:>19}{}'.format(
             colors.fg.darkgrey, 'all',
             colors.fg.green, '$'+str(total_profits),
             colors.fg.yellow, total_open_orders,
             colors.fg.blue, total_done_orders,
             colors.fg.red, total_error_orders,
-            colors.fg.orange, sec2time(round(avg(agg_epoch), 2), 0),
             colors.fg.pink, '$'+str(round(avg(agg_profits), 2)),
+            colors.fg.orange, sec2time(round(avg(agg_epoch), 2)),
             colors.reset,
     ))
-
-    print('{}{}{}'.format(colors.fg.darkgrey, '-'*105, colors.reset))
-    min_open_time = sec2time(round(min(open_times), 2), 0)
-    max_open_time = sec2time(round(max(open_times), 2), 0)
-    avg_open_time = sec2time(round(avg(open_times), 2), 0)
-    print('{}{:>24} {:>24} {:>24} {:>24}'.format(colors.fg.lightgrey, 'Open order durations', 'Min', 'Max', 'Avg'))
-    print('{:>24} {:>24} {:>24} {:>24}'.format('', min_open_time, max_open_time, avg_open_time))
+    print('')
+    draw_line(3)
+    min_open_time = sec2time(round(min(open_times), 2))
+    max_open_time = sec2time(round(max(open_times), 2))
+    avg_open_time = sec2time(round(avg(open_times), 2))
+    print('{}{:>16} {:>16} {:>16} {:>16}'.format(colors.fg.lightgrey, 'Open order times', 'Min', 'Max', 'Avg'))
+    print('{}{:>16} {:>16} {:>16} {:>16}'.format(colors.fg.lightred, ' ', min_open_time, max_open_time, avg_open_time))
 
     # Last 7 days with profits
-    print('{}{}{}'.format(colors.fg.darkgrey, '-'*105, colors.reset))
-    print('Last 7 days with profits:')
+    #print('{}{:>26}'.format(colors.fg.lightgrey, 'Last 7 days profits'))
     sorted_dates = sorted(profit_dates.keys(), reverse=True)
     x = []
     y = []
@@ -156,16 +165,21 @@ def top():
         x.append(key)
         y.append(date_total)
         #print(colors.fg.cyan, '    {} {}{:>15}'.format(key, colors.fg.green, '$'+str(date_total)))
+
+    draw_line(3)
     max_y = max(y)
-    width = 70
+    width = 50
     for i in range(len(y)):
         key = x[i]
         yy = y[i]
         nstars = int((yy/max_y) * width)
-        print(colors.fg.cyan, '    {} {}{:>15} {}{}'.format(key, colors.fg.green, '$'+str(yy), colors.fg.darkgrey, '*'*nstars))
+        print('{}{}{}{:>11} {}{}'.format(colors.fg.cyan, key, colors.fg.green, '$'+str(yy), colors.fg.darkgrey, '*'*nstars))
     if recent:
-        print('{}{}{}'.format(colors.fg.darkgrey, '-'*105, colors.reset))
-        print('Recently completed orders:', colors.fg.lightblue)
+        draw_line(3)
+        print('{}{}'.format(colors.fg.lightgrey, 'Recently completed orders'), colors.fg.blue)
+        #print('Recently completed orders:', colors.fg.lightblue)
+
+    print('    {:>8} {:>11} {:>17} {:>19}'.format('Coin', 'Profit', 'Duration', 'Completed'), colors.fg.green)
     for coin, v in recent:
         first_status = v['first_status']
         epoch = time.mktime(time.strptime(first_status['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
@@ -173,7 +187,9 @@ def top():
         epoch_diff = end_epoch - epoch
         cur_diff = cur_time - end_epoch
         profit = round(v['profit_usd'], 2)
-        print('    {} ${} duration:{} ago:{}'.format(coin, profit, sec2time(epoch_diff, 0), sec2time(cur_diff, 0)))
+        print('    {:>8} {:>11} {:>17} {:>19}'.format(
+            coin, '$'+str(profit), sec2time(epoch_diff), str(sec2time(cur_diff))+' ago')
+        )
     print(colors.reset)
 
 def main():
