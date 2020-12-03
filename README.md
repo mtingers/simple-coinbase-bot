@@ -13,7 +13,7 @@ above (see [example.conf](example.conf)).
 
 # Getting Started
 First, you will need to create an API key with view/trade permissions in your
-(Coinbase Pro profile)[https://pro.coinbase.com/profile/api].
+[Coinbase Pro profile](https://pro.coinbase.com/profile/api).
 
 Create virtualenv and install requirements:
 ```bash
