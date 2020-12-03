@@ -14,6 +14,8 @@ from datetime import datetime
 import configparser
 import smtplib
 import cbpro
+from filelock import Timeout, FileLock
+from random import uniform
 
 class SimpleCoinbaseBot:
     """ A simple bot that buys whenever it can. It can only not buy if there is currently
@@ -23,12 +25,24 @@ class SimpleCoinbaseBot:
         self.config = config
         self.log_file = config['general'].get('log_file')
         self.cache_file = config['general'].get('cache_file')
+        if not self.cache_file.endswith('.cache'):
+            raise Exception('ERROR: Cache filenames must end in .cache')
+        self.lock_file = self.cache_file.replace('.cache', '.lock')
+        self.lock = FileLock(self.lock_file, timeout=1)
+        try:
+            self.lock.acquire()
+        except:
+            print('ERROR: Failed to acquire lock: {}. Is another process already running with this config?'.format(self.lock_file))
+            exit(1)
+
         self.cache = {}
         self.sleep_seconds = config['general'].getint('sleep_seconds')
-        self.sell_at_percent = config['market'].getfloat('sell_at_percent')
+        self.sell_at_percent = Decimal(config['market'].get('sell_at_percent'))
+        self.buy_wallet_max = Decimal(config['market'].get('buy_wallet_max'))
+        self.buy_wallet_min = Decimal(config['market'].get('buy_wallet_min'))
         self.coin = config['market'].get('coin')
-        tmp = float(config['market'].get('buy_wallet_percent'))
-        self.buy_percent_of_wallet = round(Decimal(tmp/100.0), 4)
+        tmp = Decimal(config['market'].get('buy_wallet_percent'))
+        self.buy_percent_of_wallet = round(tmp/100, 4)
         self.max_sells_outstanding = config['limits'].getint('max_sells_outstanding')
         self.max_buys_per_hour = config['limits'].getint('max_buys_per_hour')
         self.mail_to = config['notify'].get('mail_to').split(',')
@@ -86,6 +100,8 @@ class SimpleCoinbaseBot:
             self._log(self.debug_log_response_file, msg)
 
     def logit(self, msg):
+        if not self.coin in msg:
+            msg = '{} {}'.format(self.coin, msg)
         self._log(self.log_file, msg)
 
     def authenticate(self):
@@ -147,13 +163,21 @@ class SimpleCoinbaseBot:
             return Decimal(fees['taker_fee_rate'])
         return Decimal(fees['maker_fee_rate'])
 
+    def _rand_msleep(self):
+        time.sleep(uniform(0.1, 0.75))
+
     def get_all(self):
+        self._rand_msleep()
         self.wallet = self.get_usd_wallet()
+        self._rand_msleep()
         self.get_product_info()
+        self._rand_msleep()
         self.current_price = self.get_current_price()
         #self.open_sells = self.get_open_sells()
         self.fee = self.get_fee()
+        self._rand_msleep()
         self.get_current_price_target()
+        self._rand_msleep()
         self.can_buy = self.check_if_can_buy()
 
     def sendemail(self, subject, msg=None):
@@ -197,6 +221,14 @@ class SimpleCoinbaseBot:
         if buy_amount < Decimal(self.product_info['min_market_funds']):
             self.logit('WARNING: Buy amount too small (<${}): {}'.format(self.product_info['min_market_funds'], buy_amount))
             return
+
+        # Make sure buy_amount is within buy_wallet_min/max
+        if buy_amount < self.buy_wallet_min:
+            self.logit('WARNING: buy_wallet_min hit. Setting to min.')
+            buy_amount = self.buy_wallet_min
+        elif buy_amount > self.buy_wallet_max:
+            self.logit('WARNING: buy_wallet_max hit. Setting to max.')
+            buy_amount = self.buy_wallet_max
 
         # adjust size to fit with fee
         buy_size = round(Decimal(buy_size) - Decimal(buy_size)*Decimal(self.fee), self.size_decimal_places)
@@ -261,7 +293,7 @@ class SimpleCoinbaseBot:
                 product_id=self.coin,
                 side='sell',
                 price=str(self.current_price_target),
-                size=self.last_buy['filled_size'],
+                size=str(round(Decimal(self.last_buy['filled_size']), self.size_decimal_places)),
             )
             self.logdebug(rc)
             self.logit('SELL-RESPONSE: {}'.format(rc))
@@ -327,7 +359,7 @@ class SimpleCoinbaseBot:
             time.sleep(0.75)
 
     def get_current_price_target(self):
-        current_percent_increase = (self.fee*2)+Decimal(self.sell_at_percent/100.0)
+        current_percent_increase = (self.fee*2)+(self.sell_at_percent/100)
         self.current_price_target = round(self.current_price * current_percent_increase + self.current_price, self.usd_decimal_places)
         self.current_price_increase = self.current_price * current_percent_increase
         return self.current_price_target
@@ -381,6 +413,8 @@ class SimpleCoinbaseBot:
         return can
 
     def run(self):
+        # Throttle startups randomly
+        time.sleep(uniform(1, 5))
         while 1:
             self.get_all()
             self.logit('STATUS: price:{} fee:{} wallet:{} open-sells:{} price-target:{} can-buy:{}'.format(
