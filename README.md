@@ -1,12 +1,13 @@
 # simple-coinbase-bot
-A simple Coinbase buy/sell bot.
+A simple Coinbase Pro buy/sell bot.
 
-This bot doesn't do anything fancy:
-1. Buy if no outstanding sell order is <= target price
-2. Target price is determined from `sell_at_percent` config option and current
-fees (e.g. `current_price * (sell_at_percent+(fees*2)) + current_price)` )
-3. After a buy is placed, an immediate limit sell order is set at target price for
-the size amount from the buy response completed order.
+The primary purpose of this bought is to buy incrementally as the price goes up and down.
+It does not do anything fancy:
+1. Buy if there are no outstanding sell orders less than the current target sell price.
+2. Target sell price is determined from `sell_at_percent` config option and current
+fees (e.g. `current_price * (sell_at_percent+(fees*2)) + current_price)` ).
+See [Coinbase Fee structure](https://help.coinbase.com/en/pro/trading-and-funding/trading-rules-and-fees/fees)
+3. After a buy is placed, an immediate limit sell order is set at target sell price equal to the buy size.
 
 A few other min/max configuration options exist for safety, but the primary logic is
 above (see [example.conf](example.conf)).
