@@ -41,7 +41,7 @@ def sec2time(sec):
     pattern = r'%2dh %2dm %2ds'
     if d == 0:
         return pattern % (h, m, s)
-    return ('%dd ' + pattern) % (d, h, m, s)
+    return ('%dd' + pattern) % (d, h, m, s)
 
 def avg(l):
     if len(l) < 1:

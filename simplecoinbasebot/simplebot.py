@@ -17,11 +17,69 @@ import cbpro
 from filelock import Timeout, FileLock
 from random import uniform
 
+def str2bool(v):
+      return v.lower() in ("yes", "true", "t", "1")
+
+# Available config options with defaults
+CONF_DEFAULTS = {
+    'auth': [
+        ('key', str, ''),
+        ('passphrase', str, ''),
+        ('b64secret', str, ''),
+    ],
+    'general': [
+        ('sleep_seconds', int, 60),
+        ('log_file', str, 'simplebot.log'),
+        ('cache_file', str, 'simplebot.cache'),
+    ],
+    'market': [
+        ('coin', str, 'None'),
+        ('sell_at_percent', Decimal, Decimal('1.0')),
+        ('buy_wallet_percent', Decimal, Decimal('2.0')),
+        ('buy_wallet_max', Decimal, Decimal('100.00')),
+        ('buy_wallet_min', Decimal, Decimal('11.00')),
+    ],
+    'limits': [
+        ('max_sells_outstanding', int, 10),
+        ('max_buys_per_hour', int, 10),
+    ],
+    'notify': [
+        ('notify_only_completed', bool, False),
+        ('mail_host', str, ''),
+        ('mail_from', str, ''),
+        ('mail_to', str, ''),
+    ],
+    'debug': [
+        ('debug_log_response', bool, False),
+        ('debug_log_response_file', str, 'simplebot-debug.log'),
+    ]
+}
+
 class SimpleCoinbaseBot:
+    def getconf(self, section, key, cast, default):
+        try:
+            val = self.config[section].get(key)
+        except:
+            return default
+        if cast == bool:
+            val = str2bool(val)
+        else:
+            val = cast(val)
+        return val
+
     def __init__(self, config):
+        self.cache = {}
         self.config = config
-        self.log_file = config['general'].get('log_file')
-        self.cache_file = config['general'].get('cache_file')
+        for section, v in CONF_DEFAULTS.items():
+            for key, cast, default in v:
+                val = self.getconf(section, key, cast, default)
+                if section == 'auth':
+                    continue
+                print('SimpleCoinbaseBot config: [{}][{}] -> {}'.format(section, key, val))
+                setattr(self, key, val)
+
+        #self.log_file = self.getconf('general', 'log_file', str, 'simplebot.log')
+        #self.cache_file = self.getconf('general', 'cache_file', str, 'simplebot.cache')
         if not self.cache_file.endswith('.cache'):
             raise Exception('ERROR: Cache filenames must end in .cache')
         self.lock_file = self.cache_file.replace('.cache', '.lock')
@@ -32,23 +90,8 @@ class SimpleCoinbaseBot:
             print('ERROR: Failed to acquire lock: {}'.format(self.lock_file))
             print('Is another process already running with this config?')
             exit(1)
-
-        self.cache = {}
-        self.sleep_seconds = config['general'].getint('sleep_seconds')
-        self.sell_at_percent = Decimal(config['market'].get('sell_at_percent'))
-        self.buy_wallet_max = Decimal(config['market'].get('buy_wallet_max'))
-        self.buy_wallet_min = Decimal(config['market'].get('buy_wallet_min'))
-        self.coin = config['market'].get('coin')
-        tmp = Decimal(config['market'].get('buy_wallet_percent'))
-        self.buy_percent_of_wallet = round(tmp/100, 4)
-        self.max_sells_outstanding = config['limits'].getint('max_sells_outstanding')
-        self.max_buys_per_hour = config['limits'].getint('max_buys_per_hour')
-        self.mail_to = config['notify'].get('mail_to').split(',')
-        self.mail_from = config['notify'].get('mail_from')
-        self.mail_host = config['notify'].get('mail_host')
-        self.debug_log_response = config['debug'].getboolean('debug_log_response')
-        if self.debug_log_response:
-            self.debug_log_response_file = config['debug'].get('debug_log_response_file')
+        self.buy_percent_of_wallet = round(self.buy_wallet_percent/100, 4)
+        self.mail_to = self.mail_to.split(',')
         self.client = self.authenticate()
         self.wallet = None
         self.current_price = None
@@ -306,7 +349,8 @@ class SimpleCoinbaseBot:
                 msg, self.last_buy['filled_size'], self.current_price_target)
             for m in msg.split('\n'):
                 self.logit(m.strip())
-            self.sendemail('BUY/SELL', msg=msg)
+            if not self.notify_only_completed:
+                self.sendemail('BUY/SELL', msg=msg)
             self.cache[order_id]['sell_order'] = rc
             self._write_cache()
             self.last_buy = None
@@ -330,7 +374,8 @@ class SimpleCoinbaseBot:
                 self.logit('WARNING: No sell_order for buy {}. This should not happen.'.format(
                     buy_order_id))
                 if time.time() - v['time'] > 60*30:
-                    self.logit('WARNING: Writing as done since it has no sell_order associated.')
+                    self.logit('WARNING: Failed to get order status:')
+                    self.logit('WARNING: Writing as done/error since it has been > 30 minutes.')
                     self.cache[buy_order_id]['completed'] = True
                     self._write_cache()
                 continue
@@ -338,6 +383,11 @@ class SimpleCoinbaseBot:
             if 'message' in sell:
                 self.logit('WARNING: Failed to get sell order status (retrying later): {}'.format(
                     sell['message']))
+                if time.time() - v['time'] > 60*30:
+                    self.logit('WARNING: Failed to get order status:')
+                    self.logit('WARNING: Writing as done/error since it has been > 30 minutes.')
+                    self.cache[buy_order_id]['completed'] = True
+                    self._write_cache()
                 continue
 
             if 'status' in sell and sell['status'] != 'open':
