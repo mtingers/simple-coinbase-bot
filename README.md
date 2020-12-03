@@ -33,7 +33,7 @@ chmod 700 etc/btc.conf
 Run the bot with the new config:
 ```
 python simplebot.py etc/btc.conf
-# -or-
+# -or- run the wrapper that will restart the bot if it errors out
 ./run.sh etc/btc.conf
 ```
 
