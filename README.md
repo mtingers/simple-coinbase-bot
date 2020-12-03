@@ -24,14 +24,17 @@ pip install -r requirements.txt
 
 Create a new configuration:
 ```bash
-cp example.conf btc.conf
-chmod 700 btc.conf
-# edit config btc.conf
+mkdir etc/ log/ cache/
+cp example.conf etc/btc.conf
+chmod 700 etc/btc.conf
+# edit config etc/btc.conf
 ```
 
 Run the bot with the new config:
 ```
-python simplebot.py btc.conf
+python simplebot.py etc/btc.conf
+# -or-
+./run.sh etc/btc.conf
 ```
 
 # Example Config
