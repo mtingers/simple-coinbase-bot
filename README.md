@@ -7,9 +7,9 @@ It does not do anything fancy:
 2. Target sell price is determined from `sell_at_percent` config option and current
 fees (e.g. `current_price * (sell_at_percent+(fees*2)) + current_price)` ).
 See [Coinbase Fee structure](https://help.coinbase.com/en/pro/trading-and-funding/trading-rules-and-fees/fees)
-3. After a buy is placed, an immediate limit sell order is set at target sell price equal to the buy size.
+3. After a buy is placed, an immediate limit sell order is placed to the calculated target price.
 
-A few other min/max configuration options exist for safety, but the primary logic is
+A few other min/max configuration options exist for safety, but the main logic is
 above (see [example.conf](example.conf)).
 
 # Getting Started
@@ -54,7 +54,8 @@ See [example.conf](example.conf) for more in depth configuration info.
 
 # Top Command
 
-The `simpeltop` script displays stats from the cache files (recent order completion, profits, open orders etc).
+The `simpeltop` script displays stats from the cache files (recent order completion, profits, open
+orders, etc).
 
 Example usage:
 
