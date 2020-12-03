@@ -14,68 +14,21 @@ the size amount from the buy response completed order.
 python3 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
-cp simplebot-example.conf simplebot.conf
-chmod 700 simplebot.conf
-# edit config simplebot.conf
+```
+```bash
+cp example.conf btc.conf
+chmod 700 btc.conf
+# edit config btc.conf
 ```
 
 Run:
 ```
-python simplebot.py simplebot.conf
+python simplebot.py btc.conf
 ```
 
 # Example Config
 
-```txt
-[auth]
-key = xyz
-passphrase = 123
-b64secret = abc
-
-[general]
-# How many seconds to sleep between polling. You should probably
-# keep around 60 seconds to avoid polling too often (it's not a realtime
-# order-book tracker)
-sleep_seconds = 60
-log_file = log/simplebot.log
-cache_file = cache/simplebot.cache
-
-
-[market]
-coin = BTC-USD
-
-# The price increase to sell at from the bought price.
-# Fees are added in to this total and accounted for.
-# Example:
-# bought_price = 100.0, sell_at_percent = 1.0
-# sell_price = bought_price + (bought_price * (sell_at_percent/100.0 + fees))
-sell_at_percent = 1.0
-
-# How much of your total USD wallet can be used each buy.
-buy_wallet_percent = 7.5
-
-
-[limits]
-# Limits to avoid buying in too much in a specific range or time period
-
-# Maximum number of outstanding sell orders. If reached, no more buys can be placed.
-max_sells_outstanding = 15
-
-# Maximum amount of buys per hour
-max_buys_per_hour = 10
-
-
-[notify]
-mail_host = mail.example.com
-mail_from = foo@example.com
-mail_to = email1@example.com, email2@example.com
-
-
-[debug]
-# Enable Coinbase API response debug logging
-debug_log_response = False
-debug_log_response_file = debug1.log
-```
+See [example.conf](example.conf) for more in depth configuration info.
 
 # Top Command
 
