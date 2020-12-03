@@ -437,18 +437,20 @@ class SimpleCoinbaseBot:
             self.check_sell_orders()
             time.sleep(self.sleep_seconds)
 
-def main(config_path):
+def usage():
+    print('{} <config-path>'.format(sys.argv[0]))
+    exit(1)
+
+def main():
+    if len(sys.argv) != 2:
+        usage()
+    config_path = sys.argv[1]
     config = configparser.ConfigParser()
     config.read(config_path)
     bot = SimpleCoinbaseBot(config)
     bot.run()
 
-def usage():
-    print('{} <config-path>'.format(sys.argv[0]))
-    exit(1)
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        usage()
-    main(sys.argv[1])
+    main()
 

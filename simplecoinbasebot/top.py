@@ -7,7 +7,7 @@ import time
 from pprint import pprint
 from os import system, name
 from datetime import timedelta, datetime
-from color import colors
+from .color import colors
 
 os.environ['TZ'] = 'UTC'
 time.tzset()
@@ -192,7 +192,13 @@ def top():
         )
     print(colors.reset)
 
+def usage():
+    print('usage: {} <cache-dir>'.format(sys.argv[0]))
+    exit(1)
+
 def main():
+    if len(sys.argv) != 2:
+        usage()
     while 1:
         top()
         time.sleep(10)

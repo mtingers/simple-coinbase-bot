@@ -21,6 +21,7 @@ Create virtualenv and install requirements:
 python3 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
+python setup.py install
 ```
 
 Create a new configuration:
@@ -33,9 +34,9 @@ chmod 700 etc/btc.conf
 
 Run the bot with the new config:
 ```
-python simplebot.py etc/btc.conf
+simplebot etc/btc.conf
 # -or- run the wrapper that will restart the bot if it errors out
-./run.sh etc/btc.conf
+persistbot etc/btc.conf
 ```
 
 # Example Config
@@ -44,12 +45,12 @@ See [example.conf](example.conf) for more in depth configuration info.
 
 # Top Command
 
-The `top.py` script displays stats from the cache files (recent order completion, profits, open orders etc).
+The `simpeltop` script displays stats from the cache files (recent order completion, profits, open orders etc).
 
 Example usage:
 
 ```bash
 # Use all .cache files in cache/ directory
-python top.py cache/
+simpletop cache/
 ```
 ![Top Example](/top1.png)
