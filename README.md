@@ -2,7 +2,7 @@
 A simple Coinbase Pro buy/sell bot.
 
 The primary purpose of this bot is to buy/sell incrementally as the price goes up and down.
-It does not do anything fancy:
+It does not do anything too fancy:
 1. Buy if there are no outstanding sell orders less than the current target sell price.
 2. Target sell price is determined from `sell_at_percent` config option and current
 fees (e.g. `current_price * (sell_at_percent+(fees*2)) + current_price)` ).
@@ -13,7 +13,7 @@ A few other min/max configuration options exist for safety, but the main logic i
 above (see [example.conf](example.conf)).
 
 # Getting Started
-First, you will need to create an API key with view/trade permissions in your
+First, create an API key with view/trade permissions in the
 [Coinbase Pro profile](https://pro.coinbase.com/profile/api).
 
 Create virtualenv and install requirements:
