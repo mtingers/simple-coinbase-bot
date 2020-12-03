@@ -11,8 +11,8 @@ setup(
     long_description=open('README.md').read(),
     url='https://github.com/mtingers/simple-coinbase-bot',
     install_requires=[
-        "filelock",
-        "cbpro",
+        'filelock>=3.0.12',
+        'cbpro>=1.1.4',
     ],
     entry_points={
         'console_scripts': [

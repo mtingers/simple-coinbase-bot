@@ -1,2 +1,2 @@
-filelock
-cbpro==1.1.4
+filelock>=3.0.12
+cbpro>=1.1.4

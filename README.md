@@ -20,6 +20,15 @@ Create virtualenv and install requirements:
 ```bash
 python3 -m venv venv
 . venv/bin/activate
+```
+
+```bash
+# PyPI
+pip install SimpleCoinbaseBot
+```
+
+```bash
+# Or install manually with setup.py
 pip install -r requirements.txt
 python setup.py install
 ```
