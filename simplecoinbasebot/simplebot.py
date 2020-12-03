@@ -373,7 +373,7 @@ class SimpleCoinbaseBot:
             if not v['sell_order']:
                 self.logit('WARNING: No sell_order for buy {}. This should not happen.'.format(
                     buy_order_id))
-                if time.time() - v['time'] > 60*30:
+                if time.time() - v['time'] > 60*60:
                     self.logit('WARNING: Failed to get order status:')
                     self.logit('WARNING: Writing as done/error since it has been > 30 minutes.')
                     self.cache[buy_order_id]['completed'] = True
@@ -383,7 +383,7 @@ class SimpleCoinbaseBot:
             if 'message' in sell:
                 self.logit('WARNING: Failed to get sell order status (retrying later): {}'.format(
                     sell['message']))
-                if time.time() - v['time'] > 60*30:
+                if time.time() - v['time'] > 60*60:
                     self.logit('WARNING: Failed to get order status:')
                     self.logit('WARNING: Writing as done/error since it has been > 30 minutes.')
                     self.cache[buy_order_id]['completed'] = True
