@@ -8,20 +8,28 @@ fees (e.g. `current_price * (sell_at_percent+(fees*2)) + current_price)` )
 3. After a buy is placed, an immediate limit sell order is set at target price for
 the size amount from the buy response completed order.
 
-# Getting Started
+A few other min/max configuration options exist for safety, but the primary logic is
+above (see [example.conf](example.conf)).
 
+# Getting Started
+First, you will need to create an API key with view/trade permissions in your
+(Coinbase Pro profile)[https://pro.coinbase.com/profile/api].
+
+Create virtualenv and install requirements:
 ```bash
 python3 -m venv venv
 . venv/bin/activate
 pip install -r requirements.txt
 ```
+
+Create a new configuration:
 ```bash
 cp example.conf btc.conf
 chmod 700 btc.conf
 # edit config btc.conf
 ```
 
-Run:
+Run the bot with the new config:
 ```
 python simplebot.py btc.conf
 ```
