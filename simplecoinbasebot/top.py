@@ -7,11 +7,91 @@ import time
 from pprint import pprint
 from os import system, name
 from datetime import timedelta, datetime
+import threading
+import re
 from .color import colors
+from .getch import getch, getchb
 
 os.environ['TZ'] = 'UTC'
 time.tzset()
 
+GETCH_LOCK = threading.Lock()
+g_last_input = None
+g_filter = ''
+g_paused = False
+
+def clear():
+    if name == 'nt':
+        system('cls')
+    else:
+        system('clear')
+
+def get_input():
+    global g_last_input
+    global g_paused
+    global g_filter
+    while 1:
+        with GETCH_LOCK:
+            g_last_input = getch()
+        if g_last_input == 'q':
+            print('exiting...')
+            break
+        if g_last_input == 'f':
+            with GETCH_LOCK:
+                g_paused = True
+                buf = 'Enter filter regex (e.g. BT.*): '
+                start_len = len(buf)
+                c = ''
+                fbuf = ''
+                sys.stdout.write('\n')
+                sys.stdout.write(buf)
+                sys.stdout.flush()
+                skip_next = 0
+                while c not in ('\n', '\r'):
+                    c = getchb()
+                    # skip escape sequence (arrow keys, etc)
+                    if ord(c) == 27:
+                        skip_next = 1
+                        continue
+                    if skip_next == 1:
+                        skip_next = 2
+                        continue
+                    if skip_next == 2:
+                        skip_next = 0
+                        continue
+                    if ord(c) == 127:
+                        if len(buf) > start_len:
+                            buf = buf[:-1]
+                            sys.stdout.write('\r')
+                            sys.stdout.write(buf+' ')
+                        if fbuf:
+                            fbuf = fbuf[:-1]
+                    elif c == '\n':
+                        break
+                    else:
+                        buf += c
+                        fbuf += c
+                    sys.stdout.write('\r')
+                    sys.stdout.write(buf)
+                    sys.stdout.flush()
+
+                g_filter = fbuf.strip()
+                print('\n')
+                try:
+                    re.compile(g_filter, flags=re.IGNORECASE)
+                except:
+                    print('Failed to compile regex: {}'.format(g_filter))
+                    g_filter = ''
+                g_paused = False
+        time.sleep(0.001)
+        """
+        data = input()
+        print(data)
+        g_last_input = data.strip()
+        if g_last_input == 'q':
+            return
+        time.sleep(.25)
+        """
 def draw_line(thickness):
     if thickness == 1:
         print('{}{}{}'.format(colors.fg.darkgrey, u'\u2581'*80, colors.reset))
@@ -25,12 +105,6 @@ def draw_line(thickness):
         print('{}{}{}'.format(colors.fg.darkgrey, u'\u2585'*80, colors.reset))
     else:
         print('{}{}{}'.format(colors.fg.darkgrey, u'\u2586'*80, colors.reset))
-
-def clear():
-    if name == 'nt':
-        system('cls')
-    else:
-        system('clear')
 
 def sec2time(sec):
     if hasattr(sec,'__len__'):
@@ -52,6 +126,9 @@ def top():
     clear()
     print('')
     files = glob.glob(sys.argv[1]+'/*.cache')
+    if not files:
+        print('ERROR: empty directory')
+        exit(1)
     stats = {}
     stats_incomplete = {}
     recent = []
@@ -70,6 +147,9 @@ def top():
             if not v['first_status']:
                 continue
             coin = v['first_status']['product_id']
+            if g_filter:
+                if not re.search(g_filter, coin, re.IGNORECASE):
+                    continue
             if not coin in stats:
                 stats[coin] = {'epoch_diffs':[], 'profits':[], 'open_orders':0, 'done_orders':0, 'avg_close_time':0.0, 'error_orders':0, }
             first_status = v['first_status']
@@ -96,7 +176,11 @@ def top():
                 stats[coin]['open_orders'] += 1
 
     sorted_keys = sorted(stats.keys())
-    print('{:>75} UTC'.format(str(datetime.now()).split('.')[0]))
+    print('[{}q{}]{}uit {}[{}f{}]{}ilter {:>59} UTC'.format(
+        colors.fg.red, colors.reset, colors.fg.lightgrey,
+        colors.reset, colors.fg.pink, colors.reset, colors.fg.lightgrey,
+        str(datetime.now()).split('.')[0])
+    )
     draw_line(1)
     print('{}{:>8} {}{:>13} {}{:>7} {}{:>7} {}{:>7} {}{:>12} {}{:>19}{}'.format(
         colors.fg.lightcyan, 'Coin',
@@ -117,6 +201,8 @@ def top():
     agg_profits = []
     for key in sorted_keys:
         coin = key
+        if not re.search(g_filter, coin, re.IGNORECASE):
+            continue
         v = stats[key]
         print('{}{:>8} {}{:>13} {}{:>7} {}{:>7} {}{:>7} {}{:>12} {}{:>19}{}'.format(
             colors.fg.lightcyan, coin,
@@ -148,9 +234,14 @@ def top():
     ))
     print('')
     draw_line(3)
-    min_open_time = sec2time(round(min(open_times), 2))
-    max_open_time = sec2time(round(max(open_times), 2))
-    avg_open_time = sec2time(round(avg(open_times), 2))
+    if open_times:
+        min_open_time = sec2time(round(min(open_times), 2))
+        max_open_time = sec2time(round(max(open_times), 2))
+        avg_open_time = sec2time(round(avg(open_times), 2))
+    else:
+        min_open_time = Decimal('0.0')
+        max_open_time = Decimal('0.0')
+        avg_open_time = Decimal('0.0')
     print('{}{:>16} {:>16} {:>16} {:>16}'.format(colors.fg.lightgrey, 'Open order times', 'Min', 'Max', 'Avg'))
     print('{}{:>16} {:>16} {:>16} {:>16}'.format(colors.fg.lightred, ' ', min_open_time, max_open_time, avg_open_time))
 
@@ -160,6 +251,8 @@ def top():
     x = []
     y = []
     for key in sorted_dates[:7]:
+        if not re.search(g_filter, key, re.IGNORECASE):
+            continue
         val = profit_dates[key]
         date_total = round(sum(val), 2)
         x.append(key)
@@ -167,13 +260,14 @@ def top():
         #print(colors.fg.cyan, '    {} {}{:>15}'.format(key, colors.fg.green, '$'+str(date_total)))
 
     draw_line(3)
-    max_y = max(y)
-    width = 50
-    for i in range(len(y)):
-        key = x[i]
-        yy = y[i]
-        nstars = int((yy/max_y) * width)
-        print('{}{}{}{:>11} {}{}'.format(colors.fg.cyan, key, colors.fg.green, '$'+str(yy), colors.fg.darkgrey, '*'*nstars))
+    if y:
+        max_y = max(y)
+        width = 50
+        for i in range(len(y)):
+            key = x[i]
+            yy = y[i]
+            nstars = int((yy/max_y) * width)
+            print('{}{}{}{:>11} {}{}'.format(colors.fg.cyan, key, colors.fg.green, '$'+str(yy), colors.fg.darkgrey, '*'*nstars))
     if recent:
         draw_line(3)
         print('{}{}'.format(colors.fg.lightgrey, 'Recently completed orders'), colors.fg.blue)
@@ -181,6 +275,8 @@ def top():
 
     print('    {:>8} {:>11} {:>17} {:>19}'.format('Coin', 'Profit', 'Duration', 'Completed'), colors.fg.green)
     for coin, v in recent:
+        if not re.search(g_filter, coin, re.IGNORECASE):
+            continue
         first_status = v['first_status']
         epoch = time.mktime(time.strptime(first_status['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
         end_epoch = time.mktime(time.strptime(v['sell_order_completed']['done_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
@@ -197,11 +293,28 @@ def usage():
     exit(1)
 
 def main():
+    global g_last_input
+    global g_paused
+    global g_filter
     if len(sys.argv) != 2:
         usage()
-    while 1:
-        top()
-        time.sleep(10)
+    files = glob.glob(sys.argv[1]+'/*.cache')
+    if not files:
+        print('ERROR: empty directory')
+        exit(1)
+    input_thread = threading.Thread(target=get_input)
+    input_thread.start()
+
+    running = True
+    while running:
+        while g_paused:
+            time.sleep(0.1)
+        with GETCH_LOCK:
+            if g_last_input == 'q':
+                running = False
+                break
+            top()
+        time.sleep(1.25)
 
 if __name__ == '__main__':
     main()
