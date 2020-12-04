@@ -272,20 +272,19 @@ def top():
         draw_line(3)
         print('{}{}'.format(colors.fg.lightgrey, 'Recently completed orders'), colors.fg.blue)
         #print('Recently completed orders:', colors.fg.lightblue)
-
-    print('    {:>8} {:>11} {:>17} {:>19}'.format('Coin', 'Profit', 'Duration', 'Completed'), colors.fg.green)
-    for coin, v in recent:
-        if not re.search(g_filter, coin, re.IGNORECASE):
-            continue
-        first_status = v['first_status']
-        epoch = time.mktime(time.strptime(first_status['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
-        end_epoch = time.mktime(time.strptime(v['sell_order_completed']['done_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
-        epoch_diff = end_epoch - epoch
-        cur_diff = cur_time - end_epoch
-        profit = round(v['profit_usd'], 2)
-        print('    {:>8} {:>11} {:>17} {:>19}'.format(
-            coin, '$'+str(profit), sec2time(epoch_diff), str(sec2time(cur_diff))+' ago')
-        )
+        print('    {:>8} {:>11} {:>17} {:>19}'.format('Coin', 'Profit', 'Duration', 'Completed'), colors.fg.green)
+        for coin, v in recent:
+            if not re.search(g_filter, coin, re.IGNORECASE):
+                continue
+            first_status = v['first_status']
+            epoch = time.mktime(time.strptime(first_status['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
+            end_epoch = time.mktime(time.strptime(v['sell_order_completed']['done_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
+            epoch_diff = end_epoch - epoch
+            cur_diff = cur_time - end_epoch
+            profit = round(v['profit_usd'], 2)
+            print('    {:>8} {:>11} {:>17} {:>19}'.format(
+                coin, '$'+str(profit), sec2time(epoch_diff), str(sec2time(cur_diff))+' ago')
+            )
     print(colors.reset)
 
 def usage():
