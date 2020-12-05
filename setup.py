@@ -3,7 +3,7 @@ import setuptools
 
 setup(
     name='SimpleCoinbaseBot',
-    version='1.1.1',
+    version='1.2.0',
     author='Matth Ingersoll',
     author_email='matth@mtingers.com',
     packages=['simplecoinbasebot',],
