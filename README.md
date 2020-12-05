@@ -63,4 +63,5 @@ Example usage:
 # Use all .cache files in cache/ directory
 simpletop cache/
 ```
-![Top Example](/top1.png)
+![simpletop](/top1.png)
+![simpletop orders and filter](/top2.png)
