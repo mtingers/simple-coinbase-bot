@@ -19,6 +19,8 @@ from operator import getitem
 from .color import colors
 from .getch import getch, getchb
 from .termsize import get_terminal_size
+import cbpro
+
 os.environ['TZ'] = 'UTC'
 time.tzset()
 
@@ -28,11 +30,33 @@ g_filter = ''
 g_paused = False
 g_show_orders = False
 
+PRICE_CACHE = {}
+PRICE_CACHE_RATE = 73.1331 #update every N seconds
+
 def clear():
     if name == 'nt':
         system('cls')
     else:
         system('clear')
+
+def get_current_price(coin):
+    last_update = time.time()
+    current_price = Decimal('0.0')
+    if not coin in PRICE_CACHE:
+        public_client = cbpro.PublicClient()
+        ticker = public_client.get_product_ticker(product_id=coin)
+        current_price = Decimal(ticker['price'])
+    else:
+        # check cache age
+        if time.time() - PRICE_CACHE[coin]['last_update'] > PRICE_CACHE_RATE:
+            public_client = cbpro.PublicClient()
+            ticker = public_client.get_product_ticker(product_id=coin)
+            current_price = Decimal(ticker['price'])
+        else:
+            last_update = PRICE_CACHE[coin]['last_update']
+            current_price  = PRICE_CACHE[coin]['price']
+    PRICE_CACHE[coin] = {'price':current_price, 'last_update':last_update}
+    return Decimal(current_price)
 
 def get_input():
     global g_last_input
@@ -153,8 +177,8 @@ def show_orders():
     )
     draw_line(1)
     print('Open orders:')
-    print('{:>17} {:>9} {:>16} {:>16} {:>18}'.format(
-        'Duration', 'Coin', 'Bought', 'Sell-Price', 'Size',
+    print('{:>15} {:>9} {:>13} {:>13} {:>14} {:>11}'.format(
+        'Duration', 'Coin', 'Bought', 'Sell-Price', 'Size', 'Diff',
     ))
     w, h = get_terminal_size()
     hn = 0
@@ -187,11 +211,14 @@ def show_orders():
             size = sell['size']
             bought_price = round(Decimal(v['last_status']['executed_value']) / Decimal(v['last_status']['filled_size']), 4)
             if hn+10 < h:
-                print('{:>17} {:>9} {:>16} {:>16} {:>18}'.format(
+                cur_price = get_current_price(sell['product_id'])
+                #print('{:>17} {:>9} {:>16} {:>16} {:>18}'.format(
+                print('{:>15} {:>9} {:>13} {:>13} {:>14} {:>11}'.format(
                     sec2time(duration),
                     sell['product_id'],
                     bought_price, price,
                     size,
+                    round(cur_price - bought_price, 2)
                 ))
             hn += 1
     if hn > h:
@@ -215,6 +242,7 @@ def top():
     profit_dates = {}
     w, h = get_terminal_size()
     hn = 0
+    open_percents = []
     for f in files:
         data = None
         coin = None
@@ -255,6 +283,15 @@ def top():
             elif v['completed']:
                 stats[coin]['error_orders'] += 1
             else:
+                cur_price = get_current_price(coin)
+                try:
+                    cur_perc = (100*(cur_price/Decimal(v['sell_order']['price']))) - Decimal('100.0')
+                    open_percents.append(cur_perc)
+                except Exception as err:
+                    # I think sometimes the state drifts after a cancel
+                    # and v['sell'] was removed but v['completed'] is not True yet
+                    #print('ERR:', err, v['sell_order'])
+                    pass
                 start_epoch = time.mktime(time.strptime(v['first_status']['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
                 open_times.append(cur_time - start_epoch)
                 stats[coin]['open_orders'] += 1
@@ -339,7 +376,13 @@ def top():
         print('{}{:>16} {:>16} {:>16} {:>16}'.format(colors.fg.lightgrey, 'Open order times', 'Min', 'Max', 'Avg'))
         print('{}{:>16} {:>16} {:>16} {:>16}'.format(colors.fg.lightred, ' ', min_open_time, max_open_time, avg_open_time))
     hn += 2
-
+    if hn+10 < h:
+        cur_drift = round(sum(open_percents), 2)
+        if cur_drift < 0:
+            print('{}Goal-drift: {}{}%'.format(colors.reset, colors.fg.red, cur_drift))
+        else:
+            print('{}Goal-drift: {}{}%'.format(colors.reset, colors.fg.green, cur_drift))
+    hn+=1
     # Last 7 days with profits
     #print('{}{:>26}'.format(colors.fg.lightgrey, 'Last 7 days profits'))
     sorted_dates_val = OrderedDict(sorted(profit_dates.items(), key = lambda x: x[1], reverse=True))
@@ -359,6 +402,7 @@ def top():
         draw_line(3)
     hn += 1
     if y:
+        total_profit = []
         max_y = max(y)
         width = 50
         for i in range(len(y)):
@@ -368,6 +412,10 @@ def top():
             if hn+10 < h:
                 print('{}{}{}{:>11} {}{}'.format(colors.fg.cyan, key, colors.fg.green, '$'+str(yy), colors.fg.darkgrey, '*'*nstars))
             hn += 1
+            total_profit.append(yy)
+        if hn+10 < h:
+            nstars = int((avg(total_profit)/max_y) * width)
+            print('{}{}{}{:>11} {}{}^'.format(colors.fg.cyan, 'Daily Avg ', colors.fg.green, '$'+str(round(avg(total_profit), 2)), colors.fg.darkgrey, ' '*(nstars-1)))
     if recent:
         if hn+10 < h:
             draw_line(3)
