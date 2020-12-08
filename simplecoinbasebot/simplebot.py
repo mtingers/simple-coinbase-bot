@@ -17,6 +17,9 @@ import cbpro
 from filelock import Timeout, FileLock
 from random import uniform
 
+os.environ['TZ'] = 'UTC'
+time.tzset()
+
 def str2bool(v):
       return v.lower() in ("yes", "true", "t", "1")
 
@@ -52,6 +55,12 @@ CONF_DEFAULTS = {
     'debug': [
         ('debug_log_response', bool, False),
         ('debug_log_response_file', str, 'simplebot-debug.log'),
+    ],
+    'stoploss': [
+        ('stoploss_enable', bool, True),
+        ('stoploss_percent', Decimal, Decimal('-5.0')),
+        ('stoploss_seconds', int, 86400),
+        ('stoploss_strategy', str, 'report'),
     ]
 }
 
@@ -116,6 +125,9 @@ class SimpleCoinbaseBot:
         self.logit('SimpleCoinbaseBot started: {} sleep_seconds:{} sell_at_percent:{} max_sells_outstanding:{} max_buys_per_hour:{}'.format(
             self.coin, self.sleep_seconds, self.sell_at_percent, self.max_sells_outstanding, self.max_buys_per_hour
         ))
+        #self.stoploss_enable = True
+        #self.stoploss_percent = Decimal('-2.0')
+        #self.stoploss_seconds = 86400
 
     def _open_cache(self):
         if os.path.exists(self.cache_file):
@@ -365,6 +377,67 @@ class SimpleCoinbaseBot:
             self.sendemail('BUY-ERROR', msg=msg)
         return buy
 
+    def run_stoploss(self, buy_order_id):
+        """ Cancel sell order, place new market sell to fill immediately
+            get response and update cache
+        """
+        v = self.cache[buy_order_id]
+        sell = v['sell_order']
+        # cancel
+        rc = self.client.cancel_order(sell['id'])
+        self.logdebug(rc)
+        self.logit('STOPLOSS: CANCEL-RESPONSE: {}'.format(rc))
+        time.sleep(5)
+    	# new order
+        rc = self.client.place_market_order(
+            product_id=self.coin,
+            side='sell',
+            size=sell['size']
+        )
+        self.logdebug(rc)
+        self.cache[buy_order_id]['sell_order'] = rc
+        self._write_cache()
+        self.logit('STOPLOSS: SELL-RESPONSE: {}'.format(rc))
+        order_id = rc['id']
+        time.sleep(5)
+        done = False
+        while 1:
+            try:
+                status = self.client.get_order(order_id)
+                self.logdebug(status)
+                self.cache[buy_order_id]['sell_order'] = status
+                self._write_cache()
+                if 'settled' in status:
+                    if status['settled']:
+                        self.logit('SELL-FILLED: {}'.format(status))
+                        self.cache[buy_order_id]['sell_order_completed'] = status
+                        self._write_cache()
+                        done = True
+                        break
+                else:
+                    if 'message' in status:
+                        self.logit('WARNING: Failed to get order status: {}'.format(status['message']))
+                        self.logit('WARNING: Order status failure may be temporary, due to coinbase issues or exchange delays. Check: https://status.pro.coinbase.com')
+                        status_errors += 1
+                    else:
+                        self.logit('WARNING: Failed to get order status: {}'.format(order_id))
+                        status_errors += 1
+                    time.sleep(10)
+                if status_errors > 10:
+                    errors += 1
+            except Exception as err:
+                self.logit('WARNING: get_order() failed:', err)
+                errors += 1
+                time.sleep(8)
+            if errors > 5:
+                self.logit('WARNING: Failed to get order. Manual intervention needed.: {}'.format(
+                    order_id))
+                break
+            time.sleep(2)
+
+        if not done:
+            self.logit('ERROR: Failed to get_order() for stoploss. This is an error and TODO item on how to handle')
+
     def check_sell_orders(self):
         """ Check if any sell orders have completed """
         for buy_order_id, v in self.cache.items():
@@ -378,6 +451,12 @@ class SimpleCoinbaseBot:
                     self.logit('WARNING: Writing as done/error since it has been > 30 minutes.')
                     self.cache[buy_order_id]['completed'] = True
                     self._write_cache()
+                continue
+            if 'message' in v['sell_order']:
+                self.logit('WARNING: Corrupted sell order, marking as done: {}'.format(v['sell_order']))
+                self.cache[buy_order_id]['completed'] = True
+                self.cache[buy_order_id]['sell_order'] = None
+                self._write_cache()
                 continue
             sell = self.client.get_order(v['sell_order']['id'])
             if 'message' in sell:
@@ -402,9 +481,10 @@ class SimpleCoinbaseBot:
                     buy_value = Decimal(v['last_status']['executed_value'])
                     #buy_sell_diff = round((sell_price*sell_filled_size) - (buy_price*buy_filled_size), 2)
                     buy_sell_diff = round(sell_value - buy_value, 2)
+                    done_at = time.mktime(time.strptime(sell['done_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
                     self.cache[buy_order_id]['profit_usd'] = buy_sell_diff
                     msg = 'SELL-COMPLETED: ~duration:{:.2f} bought_val:{} sold_val:{} profit_usd:{}'.format(
-                        time.time() - v['time'],
+                        time.time() - done_at,
                         round(buy_value, 2),
                         round(sell_value, 2),
                         buy_sell_diff
@@ -414,6 +494,35 @@ class SimpleCoinbaseBot:
                 else:
                     self.logit('SELL-COMPLETED-WITH-OTHER-STATUS: {}'.format(sell['status']))
                 self._write_cache()
+            else:
+                # check for stoploss if enabled
+                if self.stoploss_enable:
+                    created_at = time.mktime(time.strptime(sell['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
+                    duration = time.time() - created_at
+                    bought_price = round(Decimal(v['last_status']['executed_value']) / Decimal(v['last_status']['filled_size']), 4)
+                    p = 100*(self.current_price/bought_price) - Decimal('100.0')
+                    stop_seconds = False
+                    stop_percent = False
+                    if duration >= self.stoploss_seconds:
+                        stop_seconds = True
+                    if p <= self.stoploss_percent:
+                        stop_percent = True
+                    if (stop_seconds or stop_percent) and self.stoploss_strategy == 'report':
+                        self.logit('STOPLOSS: percent:{} duration:{}'.format(p, duration))
+
+                    if self.stoploss_strategy == 'both' and stop_percent and stop_seconds:
+                        self.logit('STOPLOSS: running stoploss strategy: {} percent:{} duration:{}'.format(
+                            self.stoploss_strategy,
+                            p, duration
+                        ))
+                        self.run_stoploss(buy_order_id)
+                    elif self.stoploss_strategy == 'either' and (stop_percent or stop_seconds):
+                        self.logit('STOPLOSS: running stoploss strategy: {} percent:{} duration:{}'.format(
+                            self.stoploss_strategy,
+                            p, duration
+                        ))
+                        self.run_stoploss(buy_order_id)
+
             time.sleep(0.75)
 
     def get_current_price_target(self):
@@ -468,10 +577,17 @@ class SimpleCoinbaseBot:
             sell_order = v['sell_order']
             if not sell_order:
                 continue
-            sell_price = Decimal(sell_order['price'])
-            adjusted_sell_price = round(sell_price - (self.fee*2*sell_price), self.usd_decimal_places)
-            if adjusted_sell_price <= self.current_price_target:
-                can = False
+            if not 'price' in sell_order:
+                pass
+                #iself.logit('WARNING: Corrupted sell order. Writing as completed (error): {}'.format(sell_order))
+                #self.cache[buy_order_id]['sell_order'] = None
+                #self.cache[buy_order_id]['completed'] = True
+                #self._write_cache()
+            else:
+                sell_price = Decimal(sell_order['price'])
+                adjusted_sell_price = round(sell_price - (self.fee*2*sell_price), self.usd_decimal_places)
+                if adjusted_sell_price <= self.current_price_target:
+                    can = False
         return can
 
     def run(self):
