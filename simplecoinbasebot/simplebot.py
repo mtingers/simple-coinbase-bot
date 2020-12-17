@@ -1,6 +1,5 @@
 """
-NOTE: Buys are market orders since it does not matter anymore with coinbase fees.
-Sells are limits.
+NOTE: Buys are takers/market orders and sells are makers/limit orders
 """
 import sys
 import os
@@ -104,7 +103,8 @@ class SimpleCoinbaseBot:
         self.client = self.authenticate()
         self.wallet = None
         self.current_price = None
-        self.fee = None
+        self.fee_taker = None
+        self.fee_maker = None
         self.open_sells = []
         self.product_info = None
         self.min_size = None
@@ -119,8 +119,8 @@ class SimpleCoinbaseBot:
         self.get_all()
         self.__assert()
         self._open_cache()
-        self.logit('SimpleCoinbaseBot started: {} size-precision:{} usd-precision:{} current-fee:{} min-size:{} max-size:{}'.format(
-            self.coin, self.size_decimal_places, self.usd_decimal_places, self.fee, self.min_size, self.max_size
+        self.logit('SimpleCoinbaseBot started: {} size-precision:{} usd-precision:{} current-fees:{}/{} min-size:{} max-size:{}'.format(
+            self.coin, self.size_decimal_places, self.usd_decimal_places, self.fee_taker, self.fee_maker, self.min_size, self.max_size
         ))
         self.logit('SimpleCoinbaseBot started: {} sleep_seconds:{} sell_at_percent:{} max_sells_outstanding:{} max_buys_per_hour:{}'.format(
             self.coin, self.sleep_seconds, self.sell_at_percent, self.max_sells_outstanding, self.max_buys_per_hour
@@ -212,9 +212,11 @@ class SimpleCoinbaseBot:
         fees = self.client._send_message('get', '/fees')
         assert('taker_fee_rate' in fees)
         self.logdebug(fees)
-        if Decimal(fees['taker_fee_rate']) > Decimal(fees['maker_fee_rate']):
-            return Decimal(fees['taker_fee_rate'])
-        return Decimal(fees['maker_fee_rate'])
+        self.fee_maker = Decimal(fees['maker_fee_rate'])
+        self.fee_taker = Decimal(fees['taker_fee_rate'])
+        #if self.fee_taker > self.fee_maker:
+        #    return Decimal(fees['taker_fee_rate'])
+        #return Decimal(fees['maker_fee_rate'])
 
     def _rand_msleep(self):
         time.sleep(uniform(0.1, 0.75))
@@ -227,7 +229,8 @@ class SimpleCoinbaseBot:
         self._rand_msleep()
         self.current_price = self.get_current_price()
         #self.open_sells = self.get_open_sells()
-        self.fee = self.get_fee()
+        #self.fee =
+        self.get_fee()
         self._rand_msleep()
         self.get_current_price_target()
         self._rand_msleep()
@@ -290,7 +293,7 @@ class SimpleCoinbaseBot:
             buy_amount = self.buy_wallet_max
 
         # adjust size to fit with fee
-        buy_size = round(Decimal(buy_size) - Decimal(buy_size)*Decimal(self.fee), self.size_decimal_places)
+        buy_size = round(Decimal(buy_size) - Decimal(buy_size)*Decimal(self.fee_taker), self.size_decimal_places)
         self.logit('BUY: price:{} amount:{} size:{}'.format(
             self.current_price, buy_amount, buy_size))
         rc = self.client.place_market_order(
@@ -528,7 +531,7 @@ class SimpleCoinbaseBot:
             time.sleep(0.75)
 
     def get_current_price_target(self):
-        current_percent_increase = (self.fee*2)+(self.sell_at_percent/100)
+        current_percent_increase = (self.fee_maker+self.fee_taker)+(self.sell_at_percent/100)
         self.current_price_target = round(
             self.current_price * current_percent_increase + self.current_price,
             self.usd_decimal_places
@@ -587,7 +590,7 @@ class SimpleCoinbaseBot:
                 #self._write_cache()
             else:
                 sell_price = Decimal(sell_order['price'])
-                adjusted_sell_price = round(sell_price - (self.fee*2*sell_price), self.usd_decimal_places)
+                adjusted_sell_price = round(sell_price - ((self.fee_maker+self.fee_taker)*sell_price), self.usd_decimal_places)
                 if adjusted_sell_price <= self.current_price_target:
                     can = False
         return can
@@ -597,8 +600,8 @@ class SimpleCoinbaseBot:
         time.sleep(uniform(1, 5))
         while 1:
             self.get_all()
-            self.logit('STATUS: price:{} fee:{} wallet:{} open-sells:{} price-target:{} can-buy:{}'.format(
-                self.current_price, self.fee, self.wallet, self.total_open_orders, self.current_price_target,
+            self.logit('STATUS: price:{} fees:{}/{} wallet:{} open-sells:{} price-target:{} can-buy:{}'.format(
+                self.current_price, self.fee_taker, self.fee_maker, self.wallet, self.total_open_orders, self.current_price_target,
                 self.can_buy,
             ))
             self.maybe_buy_sell()
