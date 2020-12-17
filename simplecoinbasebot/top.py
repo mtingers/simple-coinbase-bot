@@ -29,11 +29,18 @@ g_last_input = None
 g_filter = ''
 g_paused = False
 g_show_orders = False
+g_print_buf = ''
 
 PRICE_CACHE = {}
 PRICE_CACHE_RATE = 73.1331 #update every N seconds
 
+def print_b(msg):
+    global g_print_buf
+    g_print_buf = '{}{}\n'.format(g_print_buf, msg)
+
 def clear():
+    #global g_print_buf
+    #g_print_buf = ''
     if name == 'nt':
         system('cls')
     else:
@@ -419,10 +426,10 @@ def top():
     if recent:
         if hn+10 < h:
             draw_line(3)
-            print('{}{}'.format(colors.fg.lightgrey, 'Recently completed orders'), colors.fg.blue)
+            print('{}{}{}'.format(colors.fg.lightgrey, 'Recently completed orders', colors.fg.blue))
         hn += 2
         #print('Recently completed orders:', colors.fg.lightblue)
-        print('    {:>8} {:>11} {:>17} {:>19}'.format('Coin', 'Profit', 'Duration', 'Completed'), colors.fg.green)
+        print('    {:>8} {:>11} {:>17} {:>19}{}'.format('Coin', 'Profit', 'Duration', 'Completed', colors.fg.green))
         # bubble sort, why not
         for i in range(len(recent)-1):
             for j in range(len(recent)-i-1):
@@ -456,6 +463,7 @@ def main():
     global g_paused
     global g_filter
     global g_show_orders
+    global g_print_buf
     if len(sys.argv) != 2:
         usage()
     files = glob.glob(sys.argv[1]+'/*.cache')
@@ -468,6 +476,7 @@ def main():
     sleep_time = 1.33
     running = True
     while running:
+        #clear()
         while g_paused:
             time.sleep(0.1)
         with GETCH_LOCK:
