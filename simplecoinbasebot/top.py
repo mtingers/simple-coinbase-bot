@@ -34,6 +34,9 @@ g_print_buf = ''
 PRICE_CACHE = {}
 PRICE_CACHE_RATE = 73.1331 #update every N seconds
 
+def parse_datetime(d):
+    return str(d).split('.')[0].split('Z')[0]
+
 def print_b(msg):
     global g_print_buf
     g_print_buf = '{}{}\n'.format(g_print_buf, msg)
@@ -180,7 +183,7 @@ def show_orders():
         colors.fg.red, colors.reset, colors.fg.lightgrey,
         colors.reset, colors.fg.pink, colors.reset, colors.fg.lightgrey,
         colors.reset, colors.fg.green, colors.reset, colors.fg.lightgrey,
-        str(datetime.now()).split('.')[0])
+        parse_datetime(datetime.now()))
     )
     draw_line(1)
     print('Open orders:')
@@ -212,7 +215,7 @@ def show_orders():
             if v['completed'] or not v['sell_order']:
                 continue
             sell = v['sell_order']
-            created_at = time.mktime(time.strptime(sell['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
+            created_at = time.mktime(time.strptime(parse_datetime(sell['created_at']), '%Y-%m-%dT%H:%M:%S'))
             duration = cur_time - created_at
             price = sell['price']
             size = sell['size']
@@ -271,13 +274,15 @@ def top():
                     'open_orders':0, 'done_orders':0, 'avg_close_time':0.0, 'error_orders':0,
                 }
             first_status = v['first_status']
-            epoch = time.mktime(time.strptime(first_status['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
-            if v['completed'] and 'sell_order_completed' in v and v['sell_order_completed']:
+            epoch = time.mktime(time.strptime(parse_datetime(first_status['created_at']), '%Y-%m-%dT%H:%M:%S'))
+            if v['completed'] and 'sell_order_completed' in v and v['sell_order_completed'] and v['profit_usd']:
+                # NOTE: Getting some completed orders w/o all the information filled in (done_at)
+                # This seems to happen when failing to retreive status in the bot code
                 date_only = v['sell_order_completed']['done_at'].split('T')[0]
                 if not date_only in profit_dates:
                     profit_dates[date_only] = []
                 profit_dates[date_only].append(v['profit_usd'])
-                end_epoch = time.mktime(time.strptime(v['sell_order_completed']['done_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
+                end_epoch = time.mktime(time.strptime(parse_datetime(v['sell_order_completed']['done_at']), '%Y-%m-%dT%H:%M:%S'))
                 epoch_diff = end_epoch - epoch
                 cur_diff = cur_time - end_epoch
                 if cur_diff < (86400/12):
@@ -299,7 +304,7 @@ def top():
                     # and v['sell'] was removed but v['completed'] is not True yet
                     #print('ERR:', err, v['sell_order'])
                     pass
-                start_epoch = time.mktime(time.strptime(v['first_status']['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
+                start_epoch = time.mktime(time.strptime(parse_datetime(v['first_status']['created_at']), '%Y-%m-%dT%H:%M:%S'))
                 open_times.append(cur_time - start_epoch)
                 stats[coin]['open_orders'] += 1
 
@@ -310,8 +315,8 @@ def top():
         colors.fg.red, colors.reset, colors.fg.lightgrey,
         colors.reset, colors.fg.pink, colors.reset, colors.fg.lightgrey,
         colors.reset, colors.fg.blue, colors.reset, colors.fg.lightgrey,
-        str(datetime.now()).split('.')[0])
-    )
+        parse_datetime(datetime.now())
+    ))
     draw_line(1)
     print('{}{:>8} {}{:>13} {}{:>7} {}{:>7} {}{:>7} {}{:>12} {}{:>19}{}'.format(
         colors.fg.lightcyan, 'Coin',
@@ -384,11 +389,11 @@ def top():
         print('{}{:>16} {:>16} {:>16} {:>16}'.format(colors.fg.lightred, ' ', min_open_time, max_open_time, avg_open_time))
     hn += 2
     if hn+10 < h:
-        cur_drift = round(sum(open_percents), 2)
+        cur_drift = round(avg(open_percents), 2)
         if cur_drift < 0:
-            print('{}Goal-drift: {}{}%'.format(colors.reset, colors.fg.red, cur_drift))
+            print('{}Avg-drift: {}{}%'.format(colors.reset, colors.fg.red, cur_drift))
         else:
-            print('{}Goal-drift: {}{}%'.format(colors.reset, colors.fg.green, cur_drift))
+            print('{}Avg-drift: {}{}%'.format(colors.reset, colors.fg.green, cur_drift))
     hn+=1
     # Last 7 days with profits
     #print('{}{:>26}'.format(colors.fg.lightgrey, 'Last 7 days profits'))
@@ -442,8 +447,8 @@ def top():
             if not re.search(g_filter, coin, re.IGNORECASE):
                 continue
             first_status = v['first_status']
-            epoch = time.mktime(time.strptime(first_status['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
-            end_epoch = time.mktime(time.strptime(v['sell_order_completed']['done_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
+            epoch = time.mktime(time.strptime(parse_datetime(first_status['created_at']), '%Y-%m-%dT%H:%M:%S'))
+            end_epoch = time.mktime(time.strptime(parse_datetime(v['sell_order_completed']['done_at']), '%Y-%m-%dT%H:%M:%S'))
             epoch_diff = end_epoch - epoch
             cur_diff = cur_time - end_epoch
             profit = round(v['profit_usd'], 2)

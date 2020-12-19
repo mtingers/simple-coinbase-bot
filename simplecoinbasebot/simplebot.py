@@ -19,6 +19,9 @@ from random import uniform
 os.environ['TZ'] = 'UTC'
 time.tzset()
 
+def parse_datetime(d):
+    return str(d).split('.')[0].split('Z')[0]
+
 def str2bool(v):
       return v.lower() in ("yes", "true", "t", "1")
 
@@ -486,7 +489,7 @@ class SimpleCoinbaseBot:
                     buy_value = Decimal(v['last_status']['executed_value'])
                     #buy_sell_diff = round((sell_price*sell_filled_size) - (buy_price*buy_filled_size), 2)
                     buy_sell_diff = round(sell_value - buy_value, 2)
-                    done_at = time.mktime(time.strptime(sell['done_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
+                    done_at = time.mktime(time.strptime(parse_datetime(sell['done_at']), '%Y-%m-%dT%H:%M:%S'))
                     self.cache[buy_order_id]['profit_usd'] = buy_sell_diff
                     msg = 'SELL-COMPLETED: ~duration:{:.2f} bought_val:{} sold_val:{} profit_usd:{}'.format(
                         time.time() - done_at,
@@ -502,7 +505,7 @@ class SimpleCoinbaseBot:
             else:
                 # check for stoploss if enabled
                 if self.stoploss_enable:
-                    created_at = time.mktime(time.strptime(sell['created_at'].split('.')[0], '%Y-%m-%dT%H:%M:%S'))
+                    created_at = time.mktime(time.strptime(parse_datetime(sell['created_at']), '%Y-%m-%dT%H:%M:%S'))
                     duration = time.time() - created_at
                     bought_price = round(Decimal(v['last_status']['executed_value']) / Decimal(v['last_status']['filled_size']), 4)
                     p = 100*(self.current_price/bought_price) - Decimal('100.0')
