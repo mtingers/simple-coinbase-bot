@@ -277,15 +277,18 @@ class SimpleCoinbaseBot:
         if buy_size <= self.min_size:
             self.logit('WARNING: Buy size is too small {} {} < {} wallet:{}.'.format(
                 buy_amount, buy_size, self.min_size, self.wallet))
-            #buy_size = self.min_size
             self.logit('DEBUG: {}'.format(self.product_info))
-            return
+            buy_amount = self.buy_wallet_min
+            buy_size = round(Decimal(buy_amount)/self.current_price, self.size_decimal_places)
+            self.logit('DEFAULT_BUY_SIZE_TO_MIN: {} {}'.format(buy_amount, buy_size))
 
         # Check if USD wallet has enough available
         if buy_amount < Decimal(self.product_info['min_market_funds']):
             self.logit('WARNING: Buy amount too small (<${}): {}'.format(
                 self.product_info['min_market_funds'], buy_amount))
-            return
+            buy_amount = self.buy_wallet_min
+            buy_size = round(Decimal(buy_amount)/self.current_price, self.size_decimal_places)
+            self.logit('DEFAULT_BUY_SIZE_TO_MIN: {} {}'.format(buy_amount, buy_size))
 
         # Make sure buy_amount is within buy_wallet_min/max
         if buy_amount < self.buy_wallet_min:
