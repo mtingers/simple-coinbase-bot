@@ -55,7 +55,10 @@ def get_current_price(coin):
     if not coin in PRICE_CACHE:
         public_client = cbpro.PublicClient()
         ticker = public_client.get_product_ticker(product_id=coin)
-        current_price = Decimal(ticker['price'])
+        try:
+            current_price = Decimal(ticker['price'])
+        except Exception as err:
+            return None
     else:
         # check cache age
         if time.time() - PRICE_CACHE[coin]['last_update'] > PRICE_CACHE_RATE:
