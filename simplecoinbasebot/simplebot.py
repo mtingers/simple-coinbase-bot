@@ -468,6 +468,7 @@ class SimpleCoinbaseBot:
                 self.cache[buy_order_id]['completed'] = True
                 self.cache[buy_order_id]['sell_order'] = None
                 self._write_cache()
+                time.sleep(300)
                 continue
             sell = self.client.get_order(v['sell_order']['id'])
             if 'message' in sell:
