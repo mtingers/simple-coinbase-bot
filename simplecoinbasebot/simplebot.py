@@ -309,6 +309,9 @@ class SimpleCoinbaseBot:
         )
         self.logdebug(rc)
         self.logit('BUY-RESPONSE: {}'.format(rc))
+        if 'message' in rc:
+            self.logit('WARNING: Failed to buy')
+            return None
         order_id = rc['id']
         errors = 0
         self.last_buy = None
@@ -469,6 +472,7 @@ class SimpleCoinbaseBot:
                 self.cache[buy_order_id]['sell_order'] = None
                 self._write_cache()
                 time.sleep(300)
+                self.sendemail('SELL-CORRUPTED', msg='WARNING: Corrupted sell order, marking as done: {}'.format(v['sell_order']))
                 continue
             sell = self.client.get_order(v['sell_order']['id'])
             if 'message' in sell:
