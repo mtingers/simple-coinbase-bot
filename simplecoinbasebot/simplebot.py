@@ -36,6 +36,7 @@ CONF_DEFAULTS = {
         ('sleep_seconds', int, 60),
         ('log_file', str, 'simplebot.log'),
         ('cache_file', str, 'simplebot.cache'),
+        ('pause_file', str, 'bot.pause'),
     ],
     'market': [
         ('coin', str, 'None'),
@@ -118,7 +119,6 @@ class SimpleCoinbaseBot:
         self.current_price_target = None
         self.current_price_increase = None
         self.last_buy = None
-        self.pause_file = 'bot.pause'
         # Run all and validate it worked on init
         self.get_all()
         self.__assert()
