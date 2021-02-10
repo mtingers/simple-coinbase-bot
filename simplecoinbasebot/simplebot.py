@@ -118,6 +118,7 @@ class SimpleCoinbaseBot:
         self.current_price_target = None
         self.current_price_increase = None
         self.last_buy = None
+        self.pause_file = 'bot.pause'
         # Run all and validate it worked on init
         self.get_all()
         self.__assert()
@@ -460,9 +461,9 @@ class SimpleCoinbaseBot:
             if not v['sell_order']:
                 self.logit('WARNING: No sell_order for buy {}. This should not happen.'.format(
                     buy_order_id))
-                if time.time() - v['time'] > 60*60:
+                if time.time() - v['time'] > 60*60*2:
                     self.logit('WARNING: Failed to get order status:')
-                    self.logit('WARNING: Writing as done/error since it has been > 30 minutes.')
+                    self.logit('WARNING: Writing as done/error since it has been > 2 hours.')
                     self.cache[buy_order_id]['completed'] = True
                     self._write_cache()
                 continue
@@ -471,16 +472,16 @@ class SimpleCoinbaseBot:
                 self.cache[buy_order_id]['completed'] = True
                 self.cache[buy_order_id]['sell_order'] = None
                 self._write_cache()
-                time.sleep(300)
                 self.sendemail('SELL-CORRUPTED', msg='WARNING: Corrupted sell order, marking as done: {}'.format(v['sell_order']))
+                time.sleep(3600*2)
                 continue
             sell = self.client.get_order(v['sell_order']['id'])
             if 'message' in sell:
                 self.logit('WARNING: Failed to get sell order status (retrying later): {}'.format(
                     sell['message']))
-                if time.time() - v['time'] > 60*60:
+                if time.time() - v['time'] > 60*60*2:
                     self.logit('WARNING: Failed to get order status:')
-                    self.logit('WARNING: Writing as done/error since it has been > 30 minutes.')
+                    self.logit('WARNING: Writing as done/error since it has been > 2 hours.')
                     self.cache[buy_order_id]['completed'] = True
                     self._write_cache()
                 continue
@@ -610,6 +611,10 @@ class SimpleCoinbaseBot:
         # Throttle startups randomly
         time.sleep(uniform(1, 5))
         while 1:
+            if os.path.exists(self.pause_file):
+                self.logit('PAUSE')
+                time.sleep(30)
+                continue
             self.get_all()
             self.logit('STATUS: price:{} fees:{}/{} wallet:{} open-sells:{} price-target:{} can-buy:{}'.format(
                 self.current_price, self.fee_taker, self.fee_maker, self.wallet, self.total_open_orders, self.current_price_target,
