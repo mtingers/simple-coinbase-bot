@@ -32,7 +32,13 @@ g_show_orders = False
 g_print_buf = ''
 
 PRICE_CACHE = {}
-PRICE_CACHE_RATE = 73.1331 #update every N seconds
+PRICE_CACHE_RATE = 83.1331 #update every N seconds
+
+def pdiff(old, new):
+    try:
+        return round(( (Decimal(new) - Decimal(old)) / Decimal(old)) * Decimal('100.0'), 2)
+    except:
+        return 'unk'
 
 def parse_datetime(d):
     return str(d).split('.')[0].split('Z')[0]
@@ -191,7 +197,7 @@ def show_orders():
     draw_line(1)
     print('Open orders:')
     print('{:>15} {:>9} {:>13} {:>13} {:>14} {:>11}'.format(
-        'Duration', 'Coin', 'Bought', 'Sell-Price', 'Size', 'Diff',
+        'Duration', 'Coin', 'Bought', 'Sell-Price', 'Size', 'Diff%',
     ))
     w, h = get_terminal_size()
     hn = 0
@@ -220,7 +226,10 @@ def show_orders():
             sell = v['sell_order']
             created_at = time.mktime(time.strptime(parse_datetime(sell['created_at']), '%Y-%m-%dT%H:%M:%S'))
             duration = cur_time - created_at
-            price = sell['price']
+            try:
+                price = sell['price']
+            except Exception as err:
+                price = str(err)
             size = sell['size']
             bought_price = round(Decimal(v['last_status']['executed_value']) / Decimal(v['last_status']['filled_size']), 4)
             if hn+10 < h:
@@ -231,7 +240,8 @@ def show_orders():
                     sell['product_id'],
                     bought_price, price,
                     size,
-                    round(cur_price - bought_price, 2)
+                    pdiff(bought_price, cur_price),
+                    #round(cur_price - bought_price, 2)
                 ))
             hn += 1
     if hn > h:
