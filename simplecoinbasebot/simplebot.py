@@ -41,6 +41,7 @@ CONF_DEFAULTS = {
     'market': [
         ('coin', str, 'None'),
         ('sell_at_percent', Decimal, Decimal('1.0')),
+        ('sell_barrier_extra', Decimal, Decimal('0.0')),
         ('buy_wallet_percent', Decimal, Decimal('2.0')),
         ('buy_wallet_max', Decimal, Decimal('100.00')),
         ('buy_wallet_min', Decimal, Decimal('11.00')),
@@ -299,6 +300,10 @@ class SimpleCoinbaseBot:
             self.logit('WARNING: buy_wallet_max hit. Setting to max.')
             buy_amount = self.buy_wallet_max
 
+        if Decimal(self.wallet) < Decimal(self.buy_wallet_min):
+            self.logit('INSUFFICIENT_FUNDS')
+            return
+
         # adjust size to fit with fee
         buy_size = round(Decimal(buy_size) - Decimal(buy_size)*Decimal(self.fee_taker), self.size_decimal_places)
         self.logit('BUY: price:{} amount:{} size:{}'.format(
@@ -473,7 +478,7 @@ class SimpleCoinbaseBot:
                 self.cache[buy_order_id]['sell_order'] = None
                 self._write_cache()
                 self.sendemail('SELL-CORRUPTED', msg='WARNING: Corrupted sell order, marking as done: {}'.format(v['sell_order']))
-                time.sleep(3600*2)
+                time.sleep(3600)
                 continue
             sell = self.client.get_order(v['sell_order']['id'])
             if 'message' in sell:
@@ -492,13 +497,20 @@ class SimpleCoinbaseBot:
                 self.cache[buy_order_id]['completed'] = True
                 self.cache[buy_order_id]['sell_order_completed'] = sell
                 if sell['status'] == 'done':
+                    try:
+                        first_time = self.cache[buy_order_id]['first_status']['created_at']
+                    except:
+                        first_time = None
                     sell_filled_size = Decimal(sell['filled_size'])
                     sell_value = Decimal(sell['executed_value'])
                     buy_filled_size = Decimal(v['last_status']['filled_size'])
                     buy_value = Decimal(v['last_status']['executed_value'])
                     #buy_sell_diff = round((sell_price*sell_filled_size) - (buy_price*buy_filled_size), 2)
                     buy_sell_diff = round(sell_value - buy_value, 2)
-                    done_at = time.mktime(time.strptime(parse_datetime(sell['done_at']), '%Y-%m-%dT%H:%M:%S'))
+                    if first_time:
+                        done_at = time.mktime(time.strptime(parse_datetime(first_time), '%Y-%m-%dT%H:%M:%S'))
+                    else:
+                        done_at = time.mktime(time.strptime(parse_datetime(sell['done_at']), '%Y-%m-%dT%H:%M:%S'))
                     self.cache[buy_order_id]['profit_usd'] = buy_sell_diff
                     msg = 'SELL-COMPLETED: ~duration:{:.2f} bought_val:{} sold_val:{} profit_usd:{}'.format(
                         time.time() - done_at,
@@ -595,16 +607,12 @@ class SimpleCoinbaseBot:
             if not sell_order:
                 continue
             if not 'price' in sell_order:
-                pass
-                #iself.logit('WARNING: Corrupted sell order. Writing as completed (error): {}'.format(sell_order))
-                #self.cache[buy_order_id]['sell_order'] = None
-                #self.cache[buy_order_id]['completed'] = True
-                #self._write_cache()
-            else:
-                sell_price = Decimal(sell_order['price'])
-                adjusted_sell_price = round(sell_price - ((self.fee_maker+self.fee_taker)*sell_price), self.usd_decimal_places)
-                if adjusted_sell_price <= self.current_price_target:
-                    can = False
+                continue
+            sell_price = Decimal(sell_order['price'])
+            adjusted_sell_price = round(sell_price - ((Decimal(self.sell_barrier_extra/Decimal('100.0'))+self.fee_maker+self.fee_taker)*sell_price), self.usd_decimal_places)
+            if adjusted_sell_price <= self.current_price_target:
+                can = False
+                break
         return can
 
     def run(self):
