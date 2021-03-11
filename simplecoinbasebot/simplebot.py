@@ -167,6 +167,7 @@ class SimpleCoinbaseBot:
         passphrase = self.config['auth'].get('passphrase')
         b64secret = self.config['auth'].get('b64secret')
         auth_client = cbpro.AuthenticatedClient(key, b64secret, passphrase)
+        assert 'message' not in auth_client.get_accounts(), 'Auth credentials are invalid.'
         return auth_client
 
     def get_current_price(self):
