@@ -7,9 +7,11 @@ import sys
 import time
 from shlex import quote
 
+
 def usage():
     print('{} <config-file>'.format(sys.argv[0]))
     exit(1)
+
 
 def main():
     if len(sys.argv) != 2:
@@ -21,6 +23,7 @@ def main():
 
     except KeyboardInterrupt:
         print('Exiting...')
+
 
 if __name__ == '__main__':
     main()

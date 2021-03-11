@@ -1,10 +1,11 @@
 """
 NOTE: Buys are takers/market orders and sells are makers/limit orders
 """
-import sys
+import decimal
 import os
 import pickle
-import decimal
+import sys
+
 decimal.getcontext().rounding = decimal.ROUND_DOWN
 from decimal import Decimal
 # truncate instead of rounding up
@@ -13,17 +14,20 @@ from datetime import datetime
 import configparser
 import smtplib
 import cbpro
-from filelock import Timeout, FileLock
+from filelock import FileLock
 from random import uniform
 
 os.environ['TZ'] = 'UTC'
 time.tzset()
 
+
 def parse_datetime(d):
     return str(d).split('.')[0].split('Z')[0]
 
+
 def str2bool(v):
-      return v.lower() in ("yes", "true", "t", "1")
+    return v.lower() in ("yes", "true", "t", "1")
+
 
 # Available config options with defaults
 CONF_DEFAULTS = {
@@ -68,6 +72,7 @@ CONF_DEFAULTS = {
     ]
 }
 
+
 class SimpleCoinbaseBot:
     def getconf(self, section, key, cast, default):
         try:
@@ -91,8 +96,8 @@ class SimpleCoinbaseBot:
                 print('SimpleCoinbaseBot config: [{}][{}] -> {}'.format(section, key, val))
                 setattr(self, key, val)
 
-        #self.log_file = self.getconf('general', 'log_file', str, 'simplebot.log')
-        #self.cache_file = self.getconf('general', 'cache_file', str, 'simplebot.cache')
+        # self.log_file = self.getconf('general', 'log_file', str, 'simplebot.log')
+        # self.cache_file = self.getconf('general', 'cache_file', str, 'simplebot.cache')
         if not self.cache_file.endswith('.cache'):
             raise Exception('ERROR: Cache filenames must end in .cache')
         self.lock_file = self.cache_file.replace('.cache', '.lock')
@@ -103,7 +108,7 @@ class SimpleCoinbaseBot:
             print('ERROR: Failed to acquire lock: {}'.format(self.lock_file))
             print('Is another process already running with this config?')
             exit(1)
-        self.buy_percent_of_wallet = round(self.buy_wallet_percent/100, 4)
+        self.buy_percent_of_wallet = round(self.buy_wallet_percent / 100, 4)
         self.mail_to = self.mail_to.split(',')
         self.client = self.authenticate()
         self.wallet = None
@@ -124,15 +129,18 @@ class SimpleCoinbaseBot:
         self.get_all()
         self.__assert()
         self._open_cache()
-        self.logit('SimpleCoinbaseBot started: {} size-precision:{} usd-precision:{} current-fees:{}/{} min-size:{} max-size:{}'.format(
-            self.coin, self.size_decimal_places, self.usd_decimal_places, self.fee_taker, self.fee_maker, self.min_size, self.max_size
-        ))
-        self.logit('SimpleCoinbaseBot started: {} sleep_seconds:{} sell_at_percent:{} max_sells_outstanding:{} max_buys_per_hour:{}'.format(
-            self.coin, self.sleep_seconds, self.sell_at_percent, self.max_sells_outstanding, self.max_buys_per_hour
-        ))
-        #self.stoploss_enable = True
-        #self.stoploss_percent = Decimal('-2.0')
-        #self.stoploss_seconds = 86400
+        self.logit(
+            'SimpleCoinbaseBot started: {} size-precision:{} usd-precision:{} current-fees:{}/{} min-size:{} max-size:{}'.format(
+                self.coin, self.size_decimal_places, self.usd_decimal_places, self.fee_taker, self.fee_maker,
+                self.min_size, self.max_size
+            ))
+        self.logit(
+            'SimpleCoinbaseBot started: {} sleep_seconds:{} sell_at_percent:{} max_sells_outstanding:{} max_buys_per_hour:{}'.format(
+                self.coin, self.sleep_seconds, self.sell_at_percent, self.max_sells_outstanding, self.max_buys_per_hour
+            ))
+        # self.stoploss_enable = True
+        # self.stoploss_percent = Decimal('-2.0')
+        # self.stoploss_seconds = 86400
 
     def _open_cache(self):
         if os.path.exists(self.cache_file):
@@ -140,12 +148,12 @@ class SimpleCoinbaseBot:
                 self.cache = pickle.load(f)
 
     def _write_cache(self):
-        with open(self.cache_file+'-tmp', "wb") as f:
+        with open(self.cache_file + '-tmp', "wb") as f:
             pickle.dump(self.cache, f)
             os.fsync(f)
         if os.path.exists(self.cache_file):
-            os.rename(self.cache_file, self.cache_file+'-prev')
-        os.rename(self.cache_file+'-tmp', self.cache_file)
+            os.rename(self.cache_file, self.cache_file + '-prev')
+        os.rename(self.cache_file + '-tmp', self.cache_file)
 
     def _log(self, path, msg):
         now = datetime.now()
@@ -182,7 +190,7 @@ class SimpleCoinbaseBot:
             if p['id'] == self.coin:
                 self.product_info = p
                 break
-        assert(self.product_info != None)
+        assert (self.product_info != None)
         self.min_size = Decimal(self.product_info['base_min_size'])
         self.max_size = Decimal(self.product_info['base_max_size'])
         # counting the zeros will give the number of decimals to round to
@@ -213,15 +221,15 @@ class SimpleCoinbaseBot:
 
     def get_fee(self):
         """ current pip cbpro version doesn't have my get_fees() patch, so manually query it """
-        #{'taker_fee_rate': '0.0035', 'maker_fee_rate': '0.0035', 'usd_volume': '21953.58'}
+        # {'taker_fee_rate': '0.0035', 'maker_fee_rate': '0.0035', 'usd_volume': '21953.58'}
         fees = self.client._send_message('get', '/fees')
-        assert('taker_fee_rate' in fees)
+        assert ('taker_fee_rate' in fees)
         self.logdebug(fees)
         self.fee_maker = Decimal(fees['maker_fee_rate'])
         self.fee_taker = Decimal(fees['taker_fee_rate'])
-        #if self.fee_taker > self.fee_maker:
+        # if self.fee_taker > self.fee_maker:
         #    return Decimal(fees['taker_fee_rate'])
-        #return Decimal(fees['maker_fee_rate'])
+        # return Decimal(fees['maker_fee_rate'])
 
     def _rand_msleep(self):
         time.sleep(uniform(0.1, 0.75))
@@ -233,8 +241,8 @@ class SimpleCoinbaseBot:
         self.get_product_info()
         self._rand_msleep()
         self.current_price = self.get_current_price()
-        #self.open_sells = self.get_open_sells()
-        #self.fee =
+        # self.open_sells = self.get_open_sells()
+        # self.fee =
         self.get_fee()
         self._rand_msleep()
         self.get_current_price_target()
@@ -259,8 +267,8 @@ class SimpleCoinbaseBot:
             time.sleep(0.1)
 
     def __assert(self):
-        assert(self.wallet != None)
-        assert(self.current_price != None)
+        assert (self.wallet != None)
+        assert (self.current_price != None)
 
     def maybe_buy_sell(self):
         self.__assert()
@@ -275,13 +283,13 @@ class SimpleCoinbaseBot:
 
         # Calculate and check if size is large enough (sometimes it's not if available wallet is too small)
         buy_amount = round(Decimal(self.buy_percent_of_wallet) * Decimal(self.wallet), self.usd_decimal_places)
-        buy_size = round(Decimal(buy_amount)/self.current_price, self.size_decimal_places)
+        buy_size = round(Decimal(buy_amount) / self.current_price, self.size_decimal_places)
         if buy_size <= self.min_size:
             self.logit('WARNING: Buy size is too small {} {} < {} wallet:{}.'.format(
                 buy_amount, buy_size, self.min_size, self.wallet))
             self.logit('DEBUG: {}'.format(self.product_info))
             buy_amount = self.buy_wallet_min
-            buy_size = round(Decimal(buy_amount)/self.current_price, self.size_decimal_places)
+            buy_size = round(Decimal(buy_amount) / self.current_price, self.size_decimal_places)
             self.logit('DEFAULT_BUY_SIZE_TO_MIN: {} {}'.format(buy_amount, buy_size))
 
         # Check if USD wallet has enough available
@@ -289,7 +297,7 @@ class SimpleCoinbaseBot:
             self.logit('WARNING: Buy amount too small (<${}): {}'.format(
                 self.product_info['min_market_funds'], buy_amount))
             buy_amount = self.buy_wallet_min
-            buy_size = round(Decimal(buy_amount)/self.current_price, self.size_decimal_places)
+            buy_size = round(Decimal(buy_amount) / self.current_price, self.size_decimal_places)
             self.logit('DEFAULT_BUY_SIZE_TO_MIN: {} {}'.format(buy_amount, buy_size))
 
         # Make sure buy_amount is within buy_wallet_min/max
@@ -305,7 +313,7 @@ class SimpleCoinbaseBot:
             return
 
         # adjust size to fit with fee
-        buy_size = round(Decimal(buy_size) - Decimal(buy_size)*Decimal(self.fee_taker), self.size_decimal_places)
+        buy_size = round(Decimal(buy_size) - Decimal(buy_size) * Decimal(self.fee_taker), self.size_decimal_places)
         self.logit('BUY: price:{} amount:{} size:{}'.format(
             self.current_price, buy_amount, buy_size))
         rc = self.client.place_market_order(
@@ -325,8 +333,8 @@ class SimpleCoinbaseBot:
         if order_id in self.cache:
             self.logit('ERROR: order_id exists in cache. ????: {}'.format(order_id))
         self.cache[order_id] = {
-            'first_status':rc, 'last_status':None, 'time':time.time(),
-            'sell_order':None, 'sell_order_completed':None, 'completed':False, 'profit_usd':None
+            'first_status': rc, 'last_status': None, 'time': time.time(),
+            'sell_order': None, 'sell_order_completed': None, 'completed': False, 'profit_usd': None
         }
         self._write_cache()
         done = False
@@ -348,7 +356,8 @@ class SimpleCoinbaseBot:
                 else:
                     if 'message' in buy:
                         self.logit('WARNING: Failed to get order status: {}'.format(buy['message']))
-                        self.logit('WARNING: Order status failure may be temporary, due to coinbase issues or exchange delays. Check: https://status.pro.coinbase.com')
+                        self.logit(
+                            'WARNING: Order status failure may be temporary, due to coinbase issues or exchange delays. Check: https://status.pro.coinbase.com')
                         status_errors += 1
                     else:
                         self.logit('WARNING: Failed to get order status: {}'.format(order_id))
@@ -408,7 +417,7 @@ class SimpleCoinbaseBot:
         self.logdebug(rc)
         self.logit('STOPLOSS: CANCEL-RESPONSE: {}'.format(rc))
         time.sleep(5)
-    	# new order
+        # new order
         rc = self.client.place_market_order(
             product_id=self.coin,
             side='sell',
@@ -437,7 +446,8 @@ class SimpleCoinbaseBot:
                 else:
                     if 'message' in status:
                         self.logit('WARNING: Failed to get order status: {}'.format(status['message']))
-                        self.logit('WARNING: Order status failure may be temporary, due to coinbase issues or exchange delays. Check: https://status.pro.coinbase.com')
+                        self.logit(
+                            'WARNING: Order status failure may be temporary, due to coinbase issues or exchange delays. Check: https://status.pro.coinbase.com')
                         status_errors += 1
                     else:
                         self.logit('WARNING: Failed to get order status: {}'.format(order_id))
@@ -466,7 +476,7 @@ class SimpleCoinbaseBot:
             if not v['sell_order']:
                 self.logit('WARNING: No sell_order for buy {}. This should not happen.'.format(
                     buy_order_id))
-                if time.time() - v['time'] > 60*60*2:
+                if time.time() - v['time'] > 60 * 60 * 2:
                     self.logit('WARNING: Failed to get order status:')
                     self.logit('WARNING: Writing as done/error since it has been > 2 hours.')
                     self.cache[buy_order_id]['completed'] = True
@@ -477,14 +487,15 @@ class SimpleCoinbaseBot:
                 self.cache[buy_order_id]['completed'] = True
                 self.cache[buy_order_id]['sell_order'] = None
                 self._write_cache()
-                self.sendemail('SELL-CORRUPTED', msg='WARNING: Corrupted sell order, marking as done: {}'.format(v['sell_order']))
+                self.sendemail('SELL-CORRUPTED',
+                               msg='WARNING: Corrupted sell order, marking as done: {}'.format(v['sell_order']))
                 time.sleep(3600)
                 continue
             sell = self.client.get_order(v['sell_order']['id'])
             if 'message' in sell:
                 self.logit('WARNING: Failed to get sell order status (retrying later): {}'.format(
                     sell['message']))
-                if time.time() - v['time'] > 60*60*2:
+                if time.time() - v['time'] > 60 * 60 * 2:
                     self.logit('WARNING: Failed to get order status:')
                     self.logit('WARNING: Writing as done/error since it has been > 2 hours.')
                     self.cache[buy_order_id]['completed'] = True
@@ -505,7 +516,7 @@ class SimpleCoinbaseBot:
                     sell_value = Decimal(sell['executed_value'])
                     buy_filled_size = Decimal(v['last_status']['filled_size'])
                     buy_value = Decimal(v['last_status']['executed_value'])
-                    #buy_sell_diff = round((sell_price*sell_filled_size) - (buy_price*buy_filled_size), 2)
+                    # buy_sell_diff = round((sell_price*sell_filled_size) - (buy_price*buy_filled_size), 2)
                     buy_sell_diff = round(sell_value - buy_value, 2)
                     if first_time:
                         done_at = time.mktime(time.strptime(parse_datetime(first_time), '%Y-%m-%dT%H:%M:%S'))
@@ -528,8 +539,9 @@ class SimpleCoinbaseBot:
                 if self.stoploss_enable:
                     created_at = time.mktime(time.strptime(parse_datetime(sell['created_at']), '%Y-%m-%dT%H:%M:%S'))
                     duration = time.time() - created_at
-                    bought_price = round(Decimal(v['last_status']['executed_value']) / Decimal(v['last_status']['filled_size']), 4)
-                    p = 100*(self.current_price/bought_price) - Decimal('100.0')
+                    bought_price = round(
+                        Decimal(v['last_status']['executed_value']) / Decimal(v['last_status']['filled_size']), 4)
+                    p = 100 * (self.current_price / bought_price) - Decimal('100.0')
                     stop_seconds = False
                     stop_percent = False
                     if duration >= self.stoploss_seconds:
@@ -555,7 +567,7 @@ class SimpleCoinbaseBot:
             time.sleep(0.75)
 
     def get_current_price_target(self):
-        current_percent_increase = (self.fee_maker+self.fee_taker)+(self.sell_at_percent/100)
+        current_percent_increase = (self.fee_maker + self.fee_taker) + (self.sell_at_percent / 100)
         self.current_price_target = round(
             self.current_price * current_percent_increase + self.current_price,
             self.usd_decimal_places
@@ -574,7 +586,7 @@ class SimpleCoinbaseBot:
     @property
     def total_sells_in_past_hour(self):
         current_time = time.time()
-        last_hour_time = current_time - (60*60)
+        last_hour_time = current_time - (60 * 60)
         total = 0
         for buy_order_id, v in self.cache.items():
             if v['time'] >= last_hour_time:
@@ -594,13 +606,13 @@ class SimpleCoinbaseBot:
             return
 
         # Don't count other orders now, only ones being tracked here
-        #if len(self.open_sells) >= self.max_sells_outstanding:
+        # if len(self.open_sells) >= self.max_sells_outstanding:
         if self.total_open_orders >= self.max_sells_outstanding:
             self.logit('WARNING: max_sells_outstanding hit ({} of {})'.format(
                 self.total_open_orders, self.max_sells_outstanding))
             return False
         can = True
-        for buy_order_id, v in self.cache.items(): #self.open_sells:
+        for buy_order_id, v in self.cache.items():  # self.open_sells:
             if v['completed']:
                 continue
             sell_order = v['sell_order']
@@ -609,7 +621,9 @@ class SimpleCoinbaseBot:
             if not 'price' in sell_order:
                 continue
             sell_price = Decimal(sell_order['price'])
-            adjusted_sell_price = round(sell_price - ((Decimal(self.sell_barrier_extra/Decimal('100.0'))+self.fee_maker+self.fee_taker)*sell_price), self.usd_decimal_places)
+            adjusted_sell_price = round(sell_price - ((Decimal(
+                self.sell_barrier_extra / Decimal('100.0')) + self.fee_maker + self.fee_taker) * sell_price),
+                                        self.usd_decimal_places)
             if adjusted_sell_price <= self.current_price_target:
                 can = False
                 break
@@ -625,16 +639,19 @@ class SimpleCoinbaseBot:
                 continue
             self.get_all()
             self.logit('STATUS: price:{} fees:{}/{} wallet:{} open-sells:{} price-target:{} can-buy:{}'.format(
-                self.current_price, self.fee_taker, self.fee_maker, self.wallet, self.total_open_orders, self.current_price_target,
+                self.current_price, self.fee_taker, self.fee_maker, self.wallet, self.total_open_orders,
+                self.current_price_target,
                 self.can_buy,
             ))
             self.maybe_buy_sell()
             self.check_sell_orders()
             time.sleep(self.sleep_seconds)
 
+
 def usage():
     print('{} <config-path>'.format(sys.argv[0]))
     exit(1)
+
 
 def main():
     if len(sys.argv) != 2:
@@ -648,4 +665,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
