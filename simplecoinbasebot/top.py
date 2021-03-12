@@ -3,23 +3,24 @@ TODO:
     1. Refactor code so it's organized (now that I have an idea of what it'll do)
     2. Add more sorting by changing stat dict to something that's easier to sort
 """
-import os
-import sys
 import glob
+import os
 import pickle
-from decimal import Decimal
-import time
-from pprint import pprint
-from os import system, name
-from datetime import timedelta, datetime
-import threading
 import re
+import sys
+import threading
+import time
 from collections import OrderedDict
+from datetime import datetime
+from decimal import Decimal
 from operator import getitem
+from os import system, name
+
+import cbpro
+
 from .color import colors
 from .getch import getch, getchb
 from .termsize import get_terminal_size
-import cbpro
 
 os.environ['TZ'] = 'UTC'
 time.tzset()
