@@ -1,6 +1,9 @@
 # simple-coinbase-bot
 > **This project is being moved to [botic](https://github.com/mtingers/botic)**
-
+---
+---
+---
+---
 A simple Coinbase Pro buy/sell bot.
 
 The primary purpose of this bot is to buy/sell incrementally as the price goes up and down.
